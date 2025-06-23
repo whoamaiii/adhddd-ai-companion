@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useEffect } from 'react';
 import { GoogleGenAI } from "@google/genai";
 import { Header } from './components/Header';
@@ -31,7 +30,313 @@ const App: React.FC = () => {
   // States for Live Audio Body Double
   const [isBodyDoubleActive, setIsBodyDoubleActive] = useState<boolean>(false);
   const [showBodyDoubleUI, setShowBodyDoubleUI] = useState<boolean>(false);
+  const [lastCommandFeedback, setLastCommandFeedback] = useState<string>('');
+  const [enableAmbientSound, setEnableAmbientSound] = useState<boolean>(() => {
+    const saved = localStorage.getItem('enableAmbientSound');
+    return saved ? saved === 'true' : false;
+  });
 
+  const speak = useCallback((text: string) => {
+    if (enableVoice && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel(); // Cancel any previous speech
+      const utterance = new SpeechSynthesisUtterance(text);
+      window.speechSynthesis.speak(utterance);
+    }
+  }, [enableVoice]);
+
+  const handleAddTask = useCallback((taskText: string) => {
+    if (!taskText.trim()) return;
+
+    const newTask: Task = {
+      id: uuidv4(),
+      text: taskText.trim(),
+      isCompleted: false,
+    };
+
+    setTasks(prevTasks => {
+      const updatedTasks = [...prevTasks, newTask];
+      if (currentTaskIndex === -1 || prevTasks.every((t: Task) => t.isCompleted)) {
+        setCurrentTaskIndex(updatedTasks.length - 1);
+      } else if (prevTasks.length === 0) {
+        setCurrentTaskIndex(0);
+      }
+      return updatedTasks;
+    });
+    speak(`Added task: ${newTask.text.split('@')[0].trim()}`);
+  }, [currentTaskIndex, speak]);
+
+  const handleTaskComplete = useCallback(async (taskId: string) => {
+    let completedTaskTextForAISpeech = "";
+    const updatedTasks = tasks.map((task: Task) => {
+      if (task.id === taskId) {
+        completedTaskTextForAISpeech = task.text;
+        return { ...task, isCompleted: true };
+      }
+      return task;
+    });
+    setTasks(updatedTasks);
+
+    // AI Celebration message
+    let celebrationMessage = `Great job completing: ${completedTaskTextForAISpeech.split('@')[0].trim()}`;
+    if (apiKey && completedTaskTextForAISpeech) {
+      try {
+        const ai = new GoogleGenAI({ apiKey });
+        const aiCelebration = await generateCelebratoryMessageForTask(ai, completedTaskTextForAISpeech);
+        if (aiCelebration) {
+          celebrationMessage = aiCelebration;
+        }
+      } catch (e) {
+        console.error("Failed to get AI celebratory message:", e);
+        // Fallback to generic message is already set
+      }
+    }
+    speak(celebrationMessage);
+    
+    const allTasksNowCompleted = updatedTasks.every((task: Task) => task.isCompleted);
+
+    if (allTasksNowCompleted) {
+        speak("Fantastic! You've completed all tasks for this area!");
+        if (enableGamification) {
+            setStreak((s: number) => s + 1);
+        }
+        setCurrentScreen(AppScreen.AllTasksCompleted);
+    } else {
+      let nextIncompleteTaskIndex = -1;
+      let searchStartIndex = tasks.findIndex((task: Task) => task.id === taskId);
+      if (searchStartIndex === -1) searchStartIndex = 0;
+
+      for (let i = 0; i < updatedTasks.length; i++) {
+        const checkIndex = (searchStartIndex + 1 + i) % updatedTasks.length;
+        if (!updatedTasks[checkIndex].isCompleted) {
+            nextIncompleteTaskIndex = checkIndex;
+            break;
+        }
+      }
+      
+      if (nextIncompleteTaskIndex !== -1) {
+        setTimeout(() => {
+          setCurrentTaskIndex(nextIncompleteTaskIndex);
+          // Speak for next task is handled by useEffect
+        }, 500); 
+      } else { 
+        speak("Looks like that was the last one! Amazing!");
+         if (enableGamification) {
+            setStreak((s: number) => s + 1);
+        }
+        setCurrentScreen(AppScreen.AllTasksCompleted);
+      }
+    }
+  }, [tasks, speak, enableGamification, apiKey]);
+
+  // Handle voice commands from LiveAudioBodyDouble
+  const handleVoiceCommand = useCallback((event: CustomEvent) => {
+    const { command, parameters } = event.detail;
+    const action = command.action;
+    
+    // Visual feedback for command execution
+    setLastCommandFeedback(`Executing: ${command.description}`);
+    setTimeout(() => setLastCommandFeedback(''), 3000);
+    
+    switch (action) {
+      case 'COMPLETE_CURRENT_TASK':
+        if (tasks.length > 0 && currentTaskIndex >= 0 && currentTaskIndex < tasks.length) {
+          const currentTask = tasks[currentTaskIndex];
+          if (!currentTask.isCompleted) {
+            handleTaskComplete(currentTask.id);
+            speak('Task completed!');
+          } else {
+            speak('This task is already completed.');
+          }
+        } else {
+          speak('No task to complete.');
+        }
+        break;
+        
+      case 'NEXT_TASK':
+        if (tasks.length > 0) {
+          const nextIncompleteIndex = tasks.findIndex((task, index) => 
+            index > currentTaskIndex && !task.isCompleted && !task.isDeferred
+          );
+          if (nextIncompleteIndex !== -1) {
+            setCurrentTaskIndex(nextIncompleteIndex);
+            speak(`Next task: ${tasks[nextIncompleteIndex].text.split('@')[0].trim()}`);
+          } else {
+            // Wrap around to find first incomplete non-deferred task
+            const firstIncompleteIndex = tasks.findIndex(task => !task.isCompleted && !task.isDeferred);
+            if (firstIncompleteIndex !== -1 && firstIncompleteIndex !== currentTaskIndex) {
+              setCurrentTaskIndex(firstIncompleteIndex);
+              speak(`Next task: ${tasks[firstIncompleteIndex].text.split('@')[0].trim()}`);
+            } else {
+              speak('No more incomplete tasks.');
+            }
+          }
+        } else {
+          speak('No tasks available.');
+        }
+        break;
+        
+      case 'PREVIOUS_TASK':
+        if (tasks.length > 0 && currentTaskIndex > 0) {
+          const prevIndex = currentTaskIndex - 1;
+          setCurrentTaskIndex(prevIndex);
+          speak(`Previous task: ${tasks[prevIndex].text.split('@')[0].trim()}`);
+        } else if (currentTaskIndex === 0) {
+          speak('Already at the first task.');
+        } else {
+          speak('No tasks available.');
+        }
+        break;
+        
+      case 'ADD_TASK':
+        if (parameters?.taskTitle) {
+          handleAddTask(parameters.taskTitle);
+        } else {
+          // Show add task dialog or prompt
+          speak('What task would you like to add?');
+          // You might want to trigger the add task UI here
+        }
+        break;
+        
+      case 'SKIP_TASK':
+        if (tasks.length > 0 && currentTaskIndex >= 0 && currentTaskIndex < tasks.length) {
+          const currentTask = tasks[currentTaskIndex];
+          if (!currentTask.isCompleted) {
+            // Mark as deferred by updating the task
+            const updatedTasks = tasks.map(task => {
+              if (task.id === currentTask.id) {
+                return { ...task, isDeferred: true }; // You may need to add this property to Task type
+              }
+              return task;
+            });
+            setTasks(updatedTasks);
+            speak('Task skipped. Moving to next task.');
+            
+            // Move to next incomplete and non-deferred task
+            const nextIncompleteIndex = tasks.findIndex((task, index) => 
+              index > currentTaskIndex && !task.isCompleted && !task.isDeferred
+            );
+            if (nextIncompleteIndex !== -1) {
+              setCurrentTaskIndex(nextIncompleteIndex);
+            } else {
+              // Wrap around to find first incomplete non-deferred task
+              const firstIncompleteIndex = tasks.findIndex(task => !task.isCompleted && !task.isDeferred);
+              if (firstIncompleteIndex !== -1 && firstIncompleteIndex !== currentTaskIndex) {
+                setCurrentTaskIndex(firstIncompleteIndex);
+              }
+            }
+          } else {
+            speak('This task is already completed.');
+          }
+        } else {
+          speak('No task to skip.');
+        }
+        break;
+        
+      case 'START_SESSION':
+      case 'START_CLEANING':
+        if (currentScreen !== AppScreen.ImageUpload) {
+          setCurrentScreen(AppScreen.ImageUpload);
+          speak('Ready to start cleaning! Please upload an image of the area.');
+        } else {
+          speak('Already on the image upload screen.');
+        }
+        break;
+        
+      case 'QUERY_PROGRESS':
+      case 'CHECK_PROGRESS':
+        if (tasks.length > 0) {
+          const completedCount = tasks.filter(t => t.isCompleted).length;
+          const totalCount = tasks.length;
+          const percentage = Math.round((completedCount / totalCount) * 100);
+          speak(`You've completed ${completedCount} out of ${totalCount} tasks. That's ${percentage} percent! ${completedCount > 0 ? 'Great progress!' : 'Let\'s get started!'}`);
+        } else {
+          speak('No tasks to track progress on yet.');
+        }
+        break;
+        
+      case 'QUERY_NEXT_TASK':
+        if (tasks.length > 0 && currentTaskIndex >= 0 && currentTaskIndex < tasks.length) {
+          const currentTask = tasks[currentTaskIndex];
+          if (!currentTask.isCompleted) {
+            speak(`Your current task is: ${currentTask.text.split('@')[0].trim()}`);
+          } else {
+            const nextIncompleteIndex = tasks.findIndex((task, index) => 
+              index > currentTaskIndex && !task.isCompleted
+            );
+            if (nextIncompleteIndex !== -1) {
+              speak(`Your next task is: ${tasks[nextIncompleteIndex].text.split('@')[0].trim()}`);
+            } else {
+              speak('All tasks are completed!');
+            }
+          }
+        } else {
+          speak('No tasks available.');
+        }
+        break;
+        
+      case 'QUERY_TASK_COUNT':
+        if (tasks.length > 0) {
+          const remainingCount = tasks.filter(t => !t.isCompleted && !t.isDeferred).length;
+          const deferredCount = tasks.filter(t => t.isDeferred).length;
+          let message = `You have ${remainingCount} ${remainingCount === 1 ? 'task' : 'tasks'} remaining`;
+          if (deferredCount > 0) {
+            message += ` and ${deferredCount} deferred ${deferredCount === 1 ? 'task' : 'tasks'}`;
+          }
+          speak(message + '.');
+        } else {
+          speak('No tasks in your list.');
+        }
+        break;
+        
+      case 'NAVIGATE_HOME':
+        setCurrentScreen(AppScreen.ImageUpload);
+        speak('Navigating to home screen.');
+        break;
+        
+      case 'NAVIGATE_TASKS':
+        if (tasks.length > 0) {
+          setCurrentScreen(AppScreen.Tasks);
+          speak('Here are your tasks.');
+        } else {
+          speak('No tasks available. Upload an image first.');
+        }
+        break;
+        
+      case 'TOGGLE_VOICE':
+        setEnableVoice(!enableVoice);
+        if (!enableVoice) {
+          speak('Voice assistance enabled.');
+        }
+        break;
+        
+      case 'TOGGLE_AMBIENT_SOUND':
+        setEnableAmbientSound(prev => !prev);
+        speak(enableAmbientSound ? 'Ambient sounds disabled.' : 'Ambient sounds enabled.');
+        break;
+        
+      default:
+        console.log(`Unhandled voice command: ${action}`);
+        speak('Sorry, I didn\'t understand that command.');
+    }
+  }, [tasks, currentTaskIndex, currentScreen, enableVoice, enableAmbientSound, speak, handleTaskComplete, handleAddTask]);
+
+  // Listen for voice commands
+  useEffect(() => {
+    const handleVoiceCommandEvent = (event: Event) => {
+      handleVoiceCommand(event as CustomEvent);
+    };
+    
+    window.addEventListener('voice-command', handleVoiceCommandEvent);
+    
+    return () => {
+      window.removeEventListener('voice-command', handleVoiceCommandEvent);
+    };
+  }, [handleVoiceCommand]);
+
+  // Save ambient sound preference to localStorage
+  useEffect(() => {
+    localStorage.setItem('enableAmbientSound', String(enableAmbientSound));
+  }, [enableAmbientSound]);
 
   useEffect(() => {
     const keyFromEnv = import.meta.env.VITE_GEMINI_API_KEY;
@@ -94,77 +399,6 @@ const App: React.FC = () => {
     }
   }, [apiKey]);
 
-  const speak = useCallback((text: string) => {
-    if (enableVoice && 'speechSynthesis' in window) {
-      window.speechSynthesis.cancel(); // Cancel any previous speech
-      const utterance = new SpeechSynthesisUtterance(text);
-      window.speechSynthesis.speak(utterance);
-    }
-  }, [enableVoice]);
-
-  const handleTaskComplete = useCallback(async (taskId: string) => {
-    let completedTaskTextForAISpeech = "";
-    const updatedTasks = tasks.map(task => {
-      if (task.id === taskId) {
-        completedTaskTextForAISpeech = task.text;
-        return { ...task, isCompleted: true };
-      }
-      return task;
-    });
-    setTasks(updatedTasks);
-
-    // AI Celebration message
-    let celebrationMessage = `Great job completing: ${completedTaskTextForAISpeech.split('@')[0].trim()}`;
-    if (apiKey && completedTaskTextForAISpeech) {
-      try {
-        const ai = new GoogleGenAI({ apiKey });
-        const aiCelebration = await generateCelebratoryMessageForTask(ai, completedTaskTextForAISpeech);
-        if (aiCelebration) {
-          celebrationMessage = aiCelebration;
-        }
-      } catch (e) {
-        console.error("Failed to get AI celebratory message:", e);
-        // Fallback to generic message is already set
-      }
-    }
-    speak(celebrationMessage);
-    
-    const allTasksNowCompleted = updatedTasks.every(task => task.isCompleted);
-
-    if (allTasksNowCompleted) {
-        speak("Fantastic! You've completed all tasks for this area!");
-        if (enableGamification) {
-            setStreak(s => s + 1);
-        }
-        setCurrentScreen(AppScreen.AllTasksCompleted);
-    } else {
-      let nextIncompleteTaskIndex = -1;
-      let searchStartIndex = tasks.findIndex(task => task.id === taskId);
-      if (searchStartIndex === -1) searchStartIndex = 0;
-
-      for (let i = 0; i < updatedTasks.length; i++) {
-        const checkIndex = (searchStartIndex + 1 + i) % updatedTasks.length;
-        if (!updatedTasks[checkIndex].isCompleted) {
-            nextIncompleteTaskIndex = checkIndex;
-            break;
-        }
-      }
-      
-      if (nextIncompleteTaskIndex !== -1) {
-        setTimeout(() => {
-          setCurrentTaskIndex(nextIncompleteTaskIndex);
-          // Speak for next task is handled by useEffect
-        }, 500); 
-      } else { 
-        speak("Looks like that was the last one! Amazing!");
-         if (enableGamification) {
-            setStreak(s => s + 1);
-        }
-        setCurrentScreen(AppScreen.AllTasksCompleted);
-      }
-    }
-  }, [tasks, speak, enableGamification, apiKey]);
-
   const handleReset = () => {
     setUploadedImages(null);
     setImageAnalysis([]);
@@ -207,28 +441,6 @@ const App: React.FC = () => {
       setCurrentTaskIndex(firstNonCompleted !== -1 ? firstNonCompleted : 0);
     }
   };
-
-  const handleAddTask = useCallback((taskText: string) => {
-    if (!taskText.trim()) return;
-
-    const newTask: Task = {
-      id: uuidv4(),
-      text: taskText.trim(),
-      isCompleted: false,
-    };
-
-    setTasks(prevTasks => {
-      const updatedTasks = [...prevTasks, newTask];
-      if (currentTaskIndex === -1 || prevTasks.every(t => t.isCompleted)) {
-        setCurrentTaskIndex(updatedTasks.length - 1);
-      } else if (prevTasks.length === 0) {
-        setCurrentTaskIndex(0);
-      }
-      return updatedTasks;
-    });
-    speak(`Added task: ${newTask.text.split('@')[0].trim()}`);
-  }, [currentTaskIndex, speak]);
-
 
   const renderContent = () => {
     if (isLoading || currentScreen === AppScreen.Processing) {
@@ -317,6 +529,16 @@ const App: React.FC = () => {
         {renderContent()}
       </main>
 
+      {/* Voice Command Feedback */}
+      {lastCommandFeedback && (
+        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 bg-[var(--primary-color)] text-white px-6 py-3 rounded-full shadow-lg animate-fade-in-out">
+          <div className="flex items-center gap-2">
+            <i className="fas fa-microphone-alt"></i>
+            <span>{lastCommandFeedback}</span>
+          </div>
+        </div>
+      )}
+
       {/* Live Audio Body Double Floating Panel */}
       {showBodyDoubleUI && apiKey && (
         <div 
@@ -354,6 +576,8 @@ const App: React.FC = () => {
             setTimeout(() => setShowBodyDoubleUI(false), 100); 
           }
         }}
+        enableAmbientSound={enableAmbientSound}
+        onToggleAmbientSound={() => setEnableAmbientSound(s => !s)}
       />
       <footer className="text-center text-[var(--text-secondary)] mt-8 text-sm pb-4">
         <p>&copy; {new Date().getFullYear()} AI Cleaning Assistant. Powered by Gemini.</p>

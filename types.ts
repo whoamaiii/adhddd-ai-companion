@@ -6,6 +6,7 @@ export interface Task {
   estimatedTime?: string;
   difficulty?: 'easy' | 'medium' | 'hard';
   prioritizationHint?: string;
+  isDeferred?: boolean;
 }
 
 export interface ImageAnalysisObservation {

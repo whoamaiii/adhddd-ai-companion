@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Audio Body Double Example</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .container {
+            background-color: white;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        
+        .api-key-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+        }
+        
+        input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        
+        button:hover {
+            background-color: #45a049;
+        }
+        
+        #audio-component {
+            margin-top: 30px;
+            padding: 20px;
+            border: 2px dashed #ddd;
+            border-radius: 8px;
+            min-height: 200px;
+        }
+        
+        .instructions {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #e8f4f8;
+            border-left: 4px solid #2196F3;
+            border-radius: 4px;
+        }
+        
+        .mode-indicator {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+        
+        .mode-live {
+            background-color: #4CAF50;
+            color: white;
+        }
+        
+        .mode-fallback {
+            background-color: #FF9800;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Live Audio Body Double Demo</h1>
+        
+        <div class="api-key-section">
+            <h3>Setup</h3>
+            <p>Enter your Gemini API key to start:</p>
+            <input type="text" id="apiKeyInput" placeholder="Enter your Gemini API key">
+            <button onclick="initializeComponent()">Initialize</button>
+            <span id="modeIndicator"></span>
+        </div>
+        
+        <div id="audio-component">
+            <!-- Component will be inserted here -->
+        </div>
+        
+        <div class="instructions">
+            <h3>Instructions:</h3>
+            <ol>
+                <li>Enter your Gemini API key above</li>
+                <li>Click "Initialize" to create the audio component</li>
+                <li>Click the red record button to start talking</li>
+                <li>The AI will respond with voice</li>
+                <li>Click stop button to end the session</li>
+            </ol>
+            <p><strong>Note:</strong> If your API key has Live API access, it will use real-time streaming. Otherwise, it will use speech recognition + text chat + speech synthesis.</p>
+        </div>
+    </div>
+
+    <script type="module">
+        // Import the component
+        import '../components/LiveAudioBodyDouble.js';
+        
+        window.initializeComponent = function() {
+            const apiKey = document.getElementById('apiKeyInput').value.trim();
+            if (!apiKey) {
+                alert('Please enter an API key');
+                return;
+            }
+            
+            const container = document.getElementById('audio-component');
+            container.innerHTML = '';
+            
+            // Create the component
+            const audioComponent = document.createElement('gdm-live-audio-body-double');
+            audioComponent.setAttribute('api-key', apiKey);
+            
+            // Add event listeners to detect mode
+            audioComponent.addEventListener('status-update', (e) => {
+                const modeIndicator = document.getElementById('modeIndicator');
+                if (e.detail && e.detail.includes('Text mode')) {
+                    modeIndicator.innerHTML = '<span class="mode-indicator mode-fallback">Fallback Mode</span>';
+                } else if (e.detail && e.detail.includes('Connected')) {
+                    modeIndicator.innerHTML = '<span class="mode-indicator mode-live">Live API Mode</span>';
+                }
+            });
+            
+            container.appendChild(audioComponent);
+        }
+        
+        // Allow Enter key to initialize
+        document.getElementById('apiKeyInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                window.initializeComponent();
+            }
+        });
+    </script>
+</body>
+</html>

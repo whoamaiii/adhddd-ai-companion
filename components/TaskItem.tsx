@@ -39,15 +39,18 @@ export const TaskItem: React.FC<TaskItemProps> = ({
     p-3 md:p-4 rounded-xl shadow-sm border transition-all duration-300 ease-in-out flex items-start gap-3 md:gap-4 
     ${task.isCompleted 
       ? 'bg-[var(--success-bg-light)] border-[var(--success-color)] opacity-80' 
+      : task.isDeferred
+      ? 'bg-gray-50 border-gray-300 opacity-60'
       : 'bg-[var(--bg-card)] border-[var(--border-light)] hover:shadow-md'
     }
-    ${isCurrent && !task.isCompleted 
+    ${isCurrent && !task.isCompleted && !task.isDeferred
       ? 'ring-2 ring-[var(--primary-color)] scale-102 shadow-lg border-transparent' 
       : ''
     }
-    ${!task.isCompleted ? 'cursor-grab' : 'cursor-default'}
+    ${!task.isCompleted && !task.isDeferred ? 'cursor-grab' : 'cursor-default'}
     ${isBeingDragged ? 'opacity-50 border-dashed border-[var(--primary-color)]' : ''}
-    ${isDragOver && !isBeingDragged && !task.isCompleted ? 'border-t-2 border-t-[var(--primary-color)] border-b-transparent border-x-transparent shadow-none scale-100' : ''}
+    ${isDragOver && !isBeingDragged && !task.isCompleted && !task.isDeferred ? 'border-t-2 border-t-[var(--primary-color)] border-b-transparent border-x-transparent shadow-none scale-100' : ''}
+    ${task.isDeferred ? 'task-deferred' : ''}
   `;
   
   const iconContainerBase = "flex items-center justify-center rounded-full shrink-0 size-8 md:size-10 mt-1"; // Added mt-1 for better alignment with multi-line text
@@ -58,6 +61,9 @@ export const TaskItem: React.FC<TaskItemProps> = ({
   if (task.isCompleted) {
     iconContainerDynamicClasses = `${iconContainerBase} bg-[var(--success-color)] text-white`;
     iconElement = <i className="fas fa-check text-sm md:text-base"></i>;
+  } else if (task.isDeferred) {
+    iconContainerDynamicClasses = `${iconContainerBase} bg-gray-400 text-white`;
+    iconElement = <i className="fas fa-forward text-sm md:text-base"></i>;
   } else if (isCurrent) {
     iconContainerDynamicClasses = `${iconContainerBase} bg-[var(--primary-color)] text-white`;
     iconElement = <i className="fas fa-arrow-right text-sm md:text-base"></i>;
@@ -66,7 +72,7 @@ export const TaskItem: React.FC<TaskItemProps> = ({
   }
 
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>) => {
-    if (task.isCompleted) return;
+    if (task.isCompleted || task.isDeferred) return;
     e.dataTransfer.setData('text/plain', task.id);
     e.dataTransfer.effectAllowed = 'move';
     onDragStartInternal(task.id);
@@ -193,7 +199,7 @@ export const TaskItem: React.FC<TaskItemProps> = ({
         )}
       </div>
 
-      {!task.isCompleted && (
+      {!task.isCompleted && !task.isDeferred && (
         <button
           onClick={(e) => {
             e.stopPropagation(); 
@@ -205,6 +211,11 @@ export const TaskItem: React.FC<TaskItemProps> = ({
         >
           <i className="fas fa-check"></i> Done
         </button>
+      )}
+      {task.isDeferred && (
+        <div className="text-gray-500 text-xs md:text-sm flex-shrink-0 mt-1 self-start font-medium">
+          <i className="fas fa-clock"></i> Deferred
+        </div>
       )}
       {task.isCompleted && (
          <div className="text-[var(--success-color)] text-xl md:text-2xl flex-shrink-0 opacity-70 mt-1 self-start">
