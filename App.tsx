@@ -34,20 +34,20 @@ const App: React.FC = () => {
 
 
   useEffect(() => {
-    const keyFromEnv = process.env.API_KEY;
+    const keyFromEnv = import.meta.env.VITE_GEMINI_API_KEY;
     if (keyFromEnv) {
       setApiKey(keyFromEnv);
       setCurrentScreen(AppScreen.ImageUpload); 
     } else {
-      console.error("API Key not found in process.env.API_KEY. The app will not function correctly.");
-      setError("CRITICAL: API Key is not configured. Please ensure the API_KEY environment variable is set. The application cannot operate without it.");
+      console.error("API Key not found in import.meta.env.VITE_GEMINI_API_KEY. The app will not function correctly.");
+      setError("CRITICAL: API Key is not configured. Please ensure the VITE_GEMINI_API_KEY environment variable is set correctly in your .env.local file and that the application has been rebuilt/restarted if changes were made. The application cannot operate without it.");
       setCurrentScreen(AppScreen.Error);
     }
   }, []);
 
   const handleImageUpload = useCallback(async (imageDataUrls: string[]) => {
     if (!apiKey) {
-      setError("API Key is not configured. Cannot proceed.");
+      setError("API Key is not configured. Cannot proceed. Ensure VITE_GEMINI_API_KEY is set.");
       setCurrentScreen(AppScreen.Error);
       return;
     }
