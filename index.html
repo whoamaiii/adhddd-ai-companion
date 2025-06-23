@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ADHD Cleaning Companion</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" integrity="sha512-Fo3rlrZj/k7ujTnHg4CGR2D7kSs0v4LLanw2qksYuRlEzO+tcaEPQogQ0KaoGN26/zrn20ImR1DfuLWnOo7aBA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&family=Noto+Sans:wght@400;500;700;900&display=swap" rel="stylesheet"/>
+    <style type="text/tailwindcss">
+      :root {
+        --primary-color: #3dc6f4; /* Light blue from mockups */
+        --secondary-color: #00a9e2; /* Darker blue */
+        --accent-color: #007aff; /* Apple system blue */
+        
+        --text-primary: #1d1d1f; /* Near black for text */
+        --text-secondary: #6e6e73; /* Medium gray for secondary text */
+        --text-dark-gray: #374151; /* From header mockup */
+        --text-medium-gray: #6B7280; /* From header mockup */
+        
+        --bg-page: #f5f5f7; /* Light gray for page background */
+        --bg-card: #ffffff; /* White for cards */
+        --bg-light-accent: #F0F4F8; /* Very light blue/gray accent */
+
+        --border-light: #e5e5ea; /* Light gray for borders */
+        --border-medium: #d1d5db; /* Medium gray for borders */
+
+        --success-color: #34D399; /* Green for success/completion */
+        --success-bg-light: #dcfce7;
+        --error-color: #EF4444; /* Red for errors */
+        --error-bg-light: #FEE2E2;
+        --warning-color: #F59E0B; /* Amber for warnings/streaks */
+        --warning-bg-light: #FEF3C7;
+        
+        --progress-bar-background: #e5e7eb; /* Track for progress bar */
+
+        /* Specific to components if needed */
+        --header-bg: var(--bg-card); /* Header background */
+        --header-text: var(--text-dark-gray);
+      }
+      body {
+        font-family: 'Manrope', 'Noto Sans', sans-serif;
+        background-color: var(--bg-page);
+        color: var(--text-primary);
+      }
+    </style>
+    <script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@^19.1.0",
+    "react-dom/": "https://esm.sh/react-dom@^19.1.0/",
+    "react/": "https://esm.sh/react@^19.1.0/",
+    "@google/genai": "https://esm.sh/@google/genai@^1.6.0",
+    "uuid": "https://esm.sh/uuid@^11.1.0",
+    "lit/": "https://esm.sh/lit@^3.3.0/",
+    "lit": "https://esm.sh/lit@^3.3.0"
+  }
+}
+</script>
+  <link rel="stylesheet" href="/index.css">
+</head>
+  <body>
+    <div id="root"></div>
+    <!-- Load Lit components and their dependencies as modules before the main app -->
+    <!-- Ensure these paths are correct relative to the root of your project where index.html is served -->
+    <script type="module" src="/components/utils.ts"></script>
+    <script type="module" src="/components/visual-3d.ts"></script>
+    <script type="module" src="/components/LiveAudioBodyDouble.ts"></script>
+    
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>
