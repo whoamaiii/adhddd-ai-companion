@@ -6,7 +6,6 @@ import { TaskList } from './components/TaskList';
 import { LoadingSpinner } from './components/LoadingSpinner';
 import { SettingsPanel } from './components/SettingsPanel';
 import { MessageCard } from './components/MessageCard';
-import { LiveAudioBodyDoubleWrapper } from './components/LiveAudioBodyDoubleWrapper'; // Import wrapper
 import { AppScreen } from './types';
 import type { Task, ImageAnalysisObservation, GeminiTaskResponseItem } from './types';
 import { analyzeImageWithGemini, generateCleaningPlanWithGemini, generateCelebratoryMessageForTask } from './services/geminiService';
@@ -27,14 +26,7 @@ const App: React.FC = () => {
   const [enableGamification, setEnableGamification] = useState<boolean>(true);
   const [streak, setStreak] = useState<number>(0);
 
-  // States for Live Audio Body Double
-  const [isBodyDoubleActive, setIsBodyDoubleActive] = useState<boolean>(false);
-  const [showBodyDoubleUI, setShowBodyDoubleUI] = useState<boolean>(false);
   const [lastCommandFeedback, setLastCommandFeedback] = useState<string>('');
-  const [enableAmbientSound, setEnableAmbientSound] = useState<boolean>(() => {
-    const saved = localStorage.getItem('enableAmbientSound');
-    return saved ? saved === 'true' : false;
-  });
 
   const speak = useCallback((text: string) => {
     if (enableVoice && 'speechSynthesis' in window) {
@@ -128,215 +120,7 @@ const App: React.FC = () => {
     }
   }, [tasks, speak, enableGamification, apiKey]);
 
-  // Handle voice commands from LiveAudioBodyDouble
-  const handleVoiceCommand = useCallback((event: CustomEvent) => {
-    const { command, parameters } = event.detail;
-    const action = command.action;
-    
-    // Visual feedback for command execution
-    setLastCommandFeedback(`Executing: ${command.description}`);
-    setTimeout(() => setLastCommandFeedback(''), 3000);
-    
-    switch (action) {
-      case 'COMPLETE_CURRENT_TASK':
-        if (tasks.length > 0 && currentTaskIndex >= 0 && currentTaskIndex < tasks.length) {
-          const currentTask = tasks[currentTaskIndex];
-          if (!currentTask.isCompleted) {
-            handleTaskComplete(currentTask.id);
-            speak('Task completed!');
-          } else {
-            speak('This task is already completed.');
-          }
-        } else {
-          speak('No task to complete.');
-        }
-        break;
-        
-      case 'NEXT_TASK':
-        if (tasks.length > 0) {
-          const nextIncompleteIndex = tasks.findIndex((task, index) => 
-            index > currentTaskIndex && !task.isCompleted && !task.isDeferred
-          );
-          if (nextIncompleteIndex !== -1) {
-            setCurrentTaskIndex(nextIncompleteIndex);
-            speak(`Next task: ${tasks[nextIncompleteIndex].text.split('@')[0].trim()}`);
-          } else {
-            // Wrap around to find first incomplete non-deferred task
-            const firstIncompleteIndex = tasks.findIndex(task => !task.isCompleted && !task.isDeferred);
-            if (firstIncompleteIndex !== -1 && firstIncompleteIndex !== currentTaskIndex) {
-              setCurrentTaskIndex(firstIncompleteIndex);
-              speak(`Next task: ${tasks[firstIncompleteIndex].text.split('@')[0].trim()}`);
-            } else {
-              speak('No more incomplete tasks.');
-            }
-          }
-        } else {
-          speak('No tasks available.');
-        }
-        break;
-        
-      case 'PREVIOUS_TASK':
-        if (tasks.length > 0 && currentTaskIndex > 0) {
-          const prevIndex = currentTaskIndex - 1;
-          setCurrentTaskIndex(prevIndex);
-          speak(`Previous task: ${tasks[prevIndex].text.split('@')[0].trim()}`);
-        } else if (currentTaskIndex === 0) {
-          speak('Already at the first task.');
-        } else {
-          speak('No tasks available.');
-        }
-        break;
-        
-      case 'ADD_TASK':
-        if (parameters?.taskTitle) {
-          handleAddTask(parameters.taskTitle);
-        } else {
-          // Show add task dialog or prompt
-          speak('What task would you like to add?');
-          // You might want to trigger the add task UI here
-        }
-        break;
-        
-      case 'SKIP_TASK':
-        if (tasks.length > 0 && currentTaskIndex >= 0 && currentTaskIndex < tasks.length) {
-          const currentTask = tasks[currentTaskIndex];
-          if (!currentTask.isCompleted) {
-            // Mark as deferred by updating the task
-            const updatedTasks = tasks.map(task => {
-              if (task.id === currentTask.id) {
-                return { ...task, isDeferred: true }; // You may need to add this property to Task type
-              }
-              return task;
-            });
-            setTasks(updatedTasks);
-            speak('Task skipped. Moving to next task.');
-            
-            // Move to next incomplete and non-deferred task
-            const nextIncompleteIndex = tasks.findIndex((task, index) => 
-              index > currentTaskIndex && !task.isCompleted && !task.isDeferred
-            );
-            if (nextIncompleteIndex !== -1) {
-              setCurrentTaskIndex(nextIncompleteIndex);
-            } else {
-              // Wrap around to find first incomplete non-deferred task
-              const firstIncompleteIndex = tasks.findIndex(task => !task.isCompleted && !task.isDeferred);
-              if (firstIncompleteIndex !== -1 && firstIncompleteIndex !== currentTaskIndex) {
-                setCurrentTaskIndex(firstIncompleteIndex);
-              }
-            }
-          } else {
-            speak('This task is already completed.');
-          }
-        } else {
-          speak('No task to skip.');
-        }
-        break;
-        
-      case 'START_SESSION':
-      case 'START_CLEANING':
-        if (currentScreen !== AppScreen.ImageUpload) {
-          setCurrentScreen(AppScreen.ImageUpload);
-          speak('Ready to start cleaning! Please upload an image of the area.');
-        } else {
-          speak('Already on the image upload screen.');
-        }
-        break;
-        
-      case 'QUERY_PROGRESS':
-      case 'CHECK_PROGRESS':
-        if (tasks.length > 0) {
-          const completedCount = tasks.filter(t => t.isCompleted).length;
-          const totalCount = tasks.length;
-          const percentage = Math.round((completedCount / totalCount) * 100);
-          speak(`You've completed ${completedCount} out of ${totalCount} tasks. That's ${percentage} percent! ${completedCount > 0 ? 'Great progress!' : 'Let\'s get started!'}`);
-        } else {
-          speak('No tasks to track progress on yet.');
-        }
-        break;
-        
-      case 'QUERY_NEXT_TASK':
-        if (tasks.length > 0 && currentTaskIndex >= 0 && currentTaskIndex < tasks.length) {
-          const currentTask = tasks[currentTaskIndex];
-          if (!currentTask.isCompleted) {
-            speak(`Your current task is: ${currentTask.text.split('@')[0].trim()}`);
-          } else {
-            const nextIncompleteIndex = tasks.findIndex((task, index) => 
-              index > currentTaskIndex && !task.isCompleted
-            );
-            if (nextIncompleteIndex !== -1) {
-              speak(`Your next task is: ${tasks[nextIncompleteIndex].text.split('@')[0].trim()}`);
-            } else {
-              speak('All tasks are completed!');
-            }
-          }
-        } else {
-          speak('No tasks available.');
-        }
-        break;
-        
-      case 'QUERY_TASK_COUNT':
-        if (tasks.length > 0) {
-          const remainingCount = tasks.filter(t => !t.isCompleted && !t.isDeferred).length;
-          const deferredCount = tasks.filter(t => t.isDeferred).length;
-          let message = `You have ${remainingCount} ${remainingCount === 1 ? 'task' : 'tasks'} remaining`;
-          if (deferredCount > 0) {
-            message += ` and ${deferredCount} deferred ${deferredCount === 1 ? 'task' : 'tasks'}`;
-          }
-          speak(message + '.');
-        } else {
-          speak('No tasks in your list.');
-        }
-        break;
-        
-      case 'NAVIGATE_HOME':
-        setCurrentScreen(AppScreen.ImageUpload);
-        speak('Navigating to home screen.');
-        break;
-        
-      case 'NAVIGATE_TASKS':
-        if (tasks.length > 0) {
-          setCurrentScreen(AppScreen.Tasks);
-          speak('Here are your tasks.');
-        } else {
-          speak('No tasks available. Upload an image first.');
-        }
-        break;
-        
-      case 'TOGGLE_VOICE':
-        setEnableVoice(!enableVoice);
-        if (!enableVoice) {
-          speak('Voice assistance enabled.');
-        }
-        break;
-        
-      case 'TOGGLE_AMBIENT_SOUND':
-        setEnableAmbientSound(prev => !prev);
-        speak(enableAmbientSound ? 'Ambient sounds disabled.' : 'Ambient sounds enabled.');
-        break;
-        
-      default:
-        console.log(`Unhandled voice command: ${action}`);
-        speak('Sorry, I didn\'t understand that command.');
-    }
-  }, [tasks, currentTaskIndex, currentScreen, enableVoice, enableAmbientSound, speak, handleTaskComplete, handleAddTask]);
 
-  // Listen for voice commands
-  useEffect(() => {
-    const handleVoiceCommandEvent = (event: Event) => {
-      handleVoiceCommand(event as CustomEvent);
-    };
-    
-    window.addEventListener('voice-command', handleVoiceCommandEvent);
-    
-    return () => {
-      window.removeEventListener('voice-command', handleVoiceCommandEvent);
-    };
-  }, [handleVoiceCommand]);
-
-  // Save ambient sound preference to localStorage
-  useEffect(() => {
-    localStorage.setItem('enableAmbientSound', String(enableAmbientSound));
-  }, [enableAmbientSound]);
 
   useEffect(() => {
     const keyFromEnv = import.meta.env.VITE_GEMINI_API_KEY;
@@ -539,19 +323,6 @@ const App: React.FC = () => {
         </div>
       )}
 
-      {/* Live Audio Body Double Floating Panel */}
-      {showBodyDoubleUI && apiKey && (
-        <div 
-          className="fixed bottom-24 left-4 z-40 bg-[var(--bg-card)] p-3 md:p-4 rounded-xl shadow-2xl border border-[var(--border-light)] w-auto min-w-[280px]"
-          // Increased bottom margin to avoid overlapping settings panel potentially
-        >
-          <LiveAudioBodyDoubleWrapper 
-            apiKey={apiKey} 
-            isActive={isBodyDoubleActive} 
-          />
-        </div>
-      )}
-
       <SettingsPanel
         enableVoice={enableVoice}
         onToggleVoice={() => {
@@ -564,20 +335,6 @@ const App: React.FC = () => {
         }}
         enableGamification={enableGamification}
         onToggleGamification={() => setEnableGamification(g => !g)}
-        enableBodyDouble={isBodyDoubleActive} // Pass current state
-        onToggleBodyDouble={() => {
-          const newActiveState = !isBodyDoubleActive;
-          setIsBodyDoubleActive(newActiveState); // Update active state immediately
-          if (newActiveState) {
-            setShowBodyDoubleUI(true); // Show UI immediately when activating
-          } else {
-            // Delay hiding UI to allow Lit component to process isActive=false prop
-            // and potentially run its deactivation/cleanup logic
-            setTimeout(() => setShowBodyDoubleUI(false), 100); 
-          }
-        }}
-        enableAmbientSound={enableAmbientSound}
-        onToggleAmbientSound={() => setEnableAmbientSound(s => !s)}
       />
       <footer className="text-center text-[var(--text-secondary)] mt-8 text-sm pb-4">
         <p>&copy; {new Date().getFullYear()} AI Cleaning Assistant. Powered by Gemini.</p>
