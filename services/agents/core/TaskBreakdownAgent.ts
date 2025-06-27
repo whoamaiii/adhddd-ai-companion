@@ -1,6 +1,14 @@
 import { BaseAgent, AgentContext, AgentResponse, AgentCategory, AgentConfig } from '../AgentTypes';
 
+/**
+ * The TaskBreakdownAgent helps users decompose large or overwhelming tasks
+ * into smaller, more manageable subtasks.
+ */
 export class TaskBreakdownAgent extends BaseAgent {
+  /**
+   * Creates an instance of TaskBreakdownAgent.
+   * Initializes the agent with a configuration tailored for task decomposition.
+   */
   constructor() {
     const config: AgentConfig = {
       id: 'task-breakdown',
@@ -24,43 +32,68 @@ export class TaskBreakdownAgent extends BaseAgent {
     super(config);
   }
 
+  /**
+   * Determines if the TaskBreakdownAgent can provide assistance.
+   * It checks if there's a current task and if that task is potentially complex,
+   * either by its description length or by containing conjunctions suggesting multiple steps.
+   * @param {AgentContext} context The current agent context.
+   * @returns {boolean} True if the agent can help break down the task, false otherwise.
+   */
   canHelp(context: AgentContext): boolean {
-    if (!context.currentTask) return false;
+    if (!context.currentTask || !context.currentTask.description) return false;
     
-    const task = context.currentTask;
-    const isComplex = task.description && task.description.length > 50;
-    const hasMultipleActions = task.description && (
-      task.description.includes(' and ') ||
-      task.description.includes(', ') ||
-      task.description.includes(' then ')
-    );
+    const taskDescription = context.currentTask.description as string;
+    // Consider a task complex if its description is long.
+    const isLongDescription = taskDescription.length > 50;
+    // Consider a task complex if its description contains words that often link multiple actions.
+    const containsMultipleActionsKeywords =
+      taskDescription.includes(' and ') ||
+      taskDescription.includes(', ') || // Commas can separate steps
+      taskDescription.includes(' then ');
     
-    return isComplex || hasMultipleActions;
+    return isLongDescription || containsMultipleActionsKeywords;
   }
 
+  /**
+   * Analyzes the current task and suggests a breakdown into subtasks.
+   * If `canHelp` returns true, this method generates subtask suggestions based on keywords in the task description.
+   * @param {AgentContext} context The current agent context.
+   * @returns {Promise<AgentResponse | null>} An AgentResponse with subtask suggestions, or null if `canHelp` is false or no task description exists.
+   */
   async analyze(context: AgentContext): Promise<AgentResponse | null> {
-    if (!this.canHelp(context)) return null;
+    if (!this.canHelp(context) || !context.currentTask || !context.currentTask.description) return null;
 
-    const task = context.currentTask;
-    const subtasks = this.generateSubtasks(task.description);
+    const taskDescription = context.currentTask.description as string;
+    const subtasks = this.generateSubtasks(taskDescription);
+
+    if (subtasks.length === 0) return null; // No specific subtasks generated
 
     return this.createResponse(
-      `${this.config.personality?.emoji} This task looks like it has multiple parts. Here's how we can break it down:`,
+      `${this.config.personality?.emoji || '🧩'} This task looks like it has multiple parts. Here's how we can break it down:`,
       {
         suggestions: subtasks,
         priority: 'medium',
         actionItems: [{
-          type: 'suggest',
+          type: 'suggest', // Proposes a 'suggest' action containing the subtasks
           payload: { subtasks }
         }]
       }
     );
   }
 
+  /**
+   * Generates a list of suggested subtasks based on keywords in the task description.
+   * This uses a simple heuristic approach.
+   * @private
+   * @param {string} description The description of the task to break down.
+   * @returns {string[]} An array of suggested subtask strings.
+   */
   private generateSubtasks(description: string): string[] {
     const subtasks: string[] = [];
+    const lowerDesc = description.toLowerCase();
     
-    if (description.includes('clean') || description.includes('organize')) {
+    // Heuristics based on common task types
+    if (lowerDesc.includes('clean') || lowerDesc.includes('organize')) {
       subtasks.push('🎯 Clear a small 2x2 foot area first');
       subtasks.push('📦 Gather similar items together');
       subtasks.push('🗑️ Remove any obvious trash');

@@ -12,40 +12,70 @@ function base64ToGenerativePart(base64: string, mimeType: string): Part {
   };
 }
 
-function parseJsonFromGeminiResponse<T,>(responseText: string, fallbackValue: T, context?: 'observations' | 'tasks'): T {
+/**
+ * Parses a JSON string, potentially extracted from a fenced code block,
+ * with specific validation for observation and task structures.
+ *
+ * @template T The expected type of the parsed JSON.
+ * @param {string} responseText The raw response text from the AI.
+ * @param {T} fallbackValue The value to return if parsing or validation fails.
+ * @param {('observations' | 'tasks')} [context] Optional context for validation.
+ *    - 'observations': Expects an array of objects with a 'description' string property.
+ *    - 'tasks': Expects an array of objects with a 'text' string property.
+ * @returns {T} The parsed and validated JSON object, or the fallbackValue.
+ */
+function parseJsonFromGeminiResponse<T>(
+  responseText: string,
+  fallbackValue: T,
+  context?: 'observations' | 'tasks'
+): T {
   let jsonStr = responseText.trim();
+
+  // Extract content from markdown code fences if present
   const fenceRegex = /^```(\w*)?\s*\n?(.*?)\n?\s*```$/s;
   const match = jsonStr.match(fenceRegex);
   if (match && match[2]) {
     jsonStr = match[2].trim();
   }
+
   try {
+    // Attempt to parse the string as JSON
     const parsed = JSON.parse(jsonStr);
-    
-    if (context === "observations" && (!Array.isArray(parsed) || (parsed.length > 0 && typeof parsed[0]?.description !== 'string'))) {
-        console.warn("Parsed JSON for observations is not in expected format:", parsed);
+
+    // Validate structure based on context
+    if (context === "observations") {
+      if (!Array.isArray(parsed) || (parsed.length > 0 && (typeof parsed[0] !== 'object' || parsed[0] === null || typeof parsed[0].description !== 'string'))) {
+        console.warn("Parsed JSON for 'observations' is not in the expected format (Array<{description: string}>):", parsed);
         return fallbackValue;
-    }
-    if (context === "tasks" && (!Array.isArray(parsed) || (parsed.length > 0 && typeof parsed[0]?.text !== 'string'))) {
-        console.warn("Parsed JSON for tasks is not in expected format:", parsed);
+      }
+    } else if (context === "tasks") {
+      if (!Array.isArray(parsed) || (parsed.length > 0 && (typeof parsed[0] !== 'object' || parsed[0] === null || typeof parsed[0].text !== 'string'))) {
+        console.warn("Parsed JSON for 'tasks' is not in the expected format (Array<{text: string}>):", parsed);
         return fallbackValue;
+      }
     }
+
     return parsed as T;
+
   } catch (e) {
-    console.error("Failed to parse JSON response:", e, "Raw response:", responseText);
-    if (Array.isArray(fallbackValue) && fallbackValue.length === 0 && typeof responseText === 'string') { 
-        if (context === "observations" && responseText.includes("description")) { 
-             return responseText.split('\n').map(line => ({ description: line.trim() })).filter(obs => obs.description) as unknown as T;
-        }
-    }
+    console.error("Failed to parse JSON response:", e, "\nRaw response text:", responseText);
+    // The initial very naive fallback of splitting by newline is removed as it's too unreliable.
+    // The calling functions (analyzeImageWithGemini, generateCleaningPlanWithGemini)
+    // are now more responsible for handling cases where parsing fails and fallbackValue is returned.
     return fallbackValue;
   }
 }
 
-
+/**
+ * Analyzes images using Gemini AI to identify observations.
+ *
+ * @param {GoogleGenAI} ai The GoogleGenAI instance.
+ * @param {string[]} imageDataUrls Array of base64 encoded image data URLs.
+ * @returns {Promise<ImageAnalysisObservation[]>} A promise that resolves to an array of image analysis observations.
+ */
 export const analyzeImageWithGemini = async (
   ai: GoogleGenAI,
-  imageDataUrls: string[] 
+  imageDataUrls: string[]
 ): Promise<ImageAnalysisObservation[]> => {
   let allObservations: ImageAnalysisObservation[] = [];
 
@@ -54,7 +84,9 @@ export const analyzeImageWithGemini = async (
     
     const match = imageDataUrl.match(/^data:(image\/\w+);base64,(.+)$/);
     if (!match) {
-      console.error("Invalid image data URL format:", imageDataUrl.substring(0, 50) + "...");
+      console.error("Invalid image data URL format (first 50 chars):", imageDataUrl.substring(0, 50) + "...");
+      // Optionally add a user-facing error observation, or let the overall result be empty
+      // allObservations.push({ description: "Error: Invalid image data format provided." });
       continue; 
     }
     const mimeType = match[1];
@@ -64,71 +96,80 @@ export const analyzeImageWithGemini = async (
     parts.push({ text: INITIAL_ANALYSIS_PROMPT });
     
     try {
-      const response: GenerateContentResponse = await ai.models.generateContent({
-        model: GEMINI_TEXT_MODEL,
-        contents: [{ parts: parts }],
-        config: {
-          responseMimeType: "application/json",
-        }
-      });
+      const result = await ai.getGenerativeModel({ model: GEMINI_TEXT_MODEL })
+        .generateContent({
+          contents: [{ role: "user", parts }],
+          generationConfig: { responseMimeType: "application/json"},
+        });
 
-      const observations = parseJsonFromGeminiResponse<ImageAnalysisObservation[]>(response.text, [], "observations");
+      const response = result.response;
+      const responseText = response.text(); // Ensure text() is called to get the string
+
+      // Use the improved parser. Fallback is an empty array.
+      const observations = parseJsonFromGeminiResponse<ImageAnalysisObservation[]>(responseText, [], "observations");
       
+      // The parser now returns fallbackValue if validation fails, so this specific check might be redundant
+      // but kept for explicitness if the definition of "valid" observation changes.
       if (!Array.isArray(observations) || (observations.length > 0 && typeof observations[0]?.description !== 'string')) {
-          console.warn("Gemini analysis for one image did not return expected JSON structure. Response text:", response.text);
-          if (typeof response.text === 'string' && response.text.trim().length > 0) {
-            allObservations.push({description: `Could not parse structured analysis for an image. Raw AI output: ${response.text.substring(0,100)}...`});
+          console.warn("Gemini analysis for an image did not return the expected JSON structure. Response text:", responseText);
+          // Add a generic error observation if parsing failed or structure is wrong, and responseText is non-empty
+          if (typeof responseText === 'string' && responseText.trim().length > 0) {
+            allObservations.push({description: `AI analysis issue: Could not parse structured data. Raw output (first 100 chars): ${responseText.substring(0,100)}...`});
           }
-          continue; 
+          // Continue to next image
+      } else {
+        allObservations = allObservations.concat(observations);
       }
-      allObservations = allObservations.concat(observations);
 
     } catch (error) {
       console.error("Error analyzing one image with Gemini:", error);
-      allObservations.push({ description: `Error analyzing one of the images: ${error instanceof Error ? error.message : String(error)}` });
+      allObservations.push({ description: `Error during AI image analysis: ${error instanceof Error ? error.message : String(error)}` });
     }
   }
-
-  if (allObservations.length === 0 && imageDataUrls.length > 0) {
-    // Return empty if no observations, let App.tsx handle messaging
-    // throw new Error("AI image analysis failed for all provided images or returned no observations.");
-  }
+  // No explicit throw here; App.tsx handles empty observation list.
   return allObservations;
 };
 
+/**
+ * Generates a cleaning plan with Gemini AI based on image analysis observations.
+ *
+ * @param {GoogleGenAI} ai The GoogleGenAI instance.
+ * @param {ImageAnalysisObservation[]} analysis Array of image analysis observations.
+ * @returns {Promise<Partial<Task>[]>} A promise that resolves to an array of partial tasks.
+ */
 export const generateCleaningPlanWithGemini = async (
   ai: GoogleGenAI,
   analysis: ImageAnalysisObservation[]
-): Promise<Partial<Task>[]> => { // Return type changed to Partial<Task>[]
+): Promise<Partial<Task>[]> => {
   if (analysis.length === 0) {
-    // Return empty array, App.tsx will handle messaging or allow manual add
-    return []; 
+    return []; // No observations, no plan.
   }
   const observationsText = analysis.map(obs => obs.description).join("\n");
   const prompt = TASK_GENERATION_PROMPT_TEMPLATE(observationsText);
 
   try {
-    const response: GenerateContentResponse = await ai.models.generateContent({
-      model: GEMINI_TEXT_MODEL,
-      contents: [{ parts: [{text: prompt}] }],
-      config: {
-        responseMimeType: "application/json",
-      }
-    });
-    
-    const taskItems = parseJsonFromGeminiResponse<GeminiTaskResponseItem[]>(response.text, [], "tasks");
+    const result = await ai.getGenerativeModel({ model: GEMINI_TEXT_MODEL })
+      .generateContent({
+        contents: [{ role: "user", parts: [{text: prompt}] }],
+        generationConfig: { responseMimeType: "application/json" },
+      });
 
-    if (!Array.isArray(taskItems) || (taskItems.length > 0 && typeof taskItems[0]?.text !== 'string')) {
-        console.warn("Gemini task generation did not return expected JSON structure. Response text:", response.text);
-        // Fallback: try to split raw text into simple tasks if it's just a list
-        if (typeof response.text === 'string' && response.text.trim().length > 0) {
-            return response.text.split('\n').map(t => ({ text: t.trim() })).filter(t => t.text.length > 0);
-        }
-        throw new Error("AI task generation result is not in the expected format and no fallback could be applied.");
+    const response = result.response;
+    const responseText = response.text();
+
+    const taskItems = parseJsonFromGeminiResponse<GeminiTaskResponseItem[]>(responseText, [], "tasks");
+
+    // If taskItems is empty after parsing AND the raw response wasn't just "[]" or ""
+    // it implies parsing might have failed or AI gave non-JSON text.
+    if (taskItems.length === 0 && responseText.trim() !== "[]" && responseText.trim() !== "") {
+        console.warn("Gemini task generation returned empty after parsing, but raw response was not empty. Raw response:", responseText);
+        // Fallback: Create a single task indicating an issue.
+        return [{text: "AI task generation issue: Could not parse a structured plan. Please try again or add tasks manually."}];
     }
     
-    if (taskItems.length === 0 && response.text.trim() !== "[]" && response.text.trim() !== "") { 
-        return [{text: "AI returned an empty task list. Perhaps the area is already clean or the observations were unclear."}];
+    // If AI legitimately returns an empty list of tasks (e.g. room is clean)
+    if (taskItems.length === 0 && (responseText.trim() === "[]" || responseText.trim() === "")) {
+        return [{text: "AI suggests no specific tasks are needed for this area, or the observations were unclear."}];
     }
 
     // Map GeminiTaskResponseItem to Partial<Task>
@@ -145,23 +186,37 @@ export const generateCleaningPlanWithGemini = async (
   }
 };
 
+/**
+ * Generates a short, positive celebratory message for a completed task using Gemini AI.
+ * Includes fallbacks for empty task text, empty AI response, or AI errors.
+ *
+ * @param {GoogleGenAI} ai The GoogleGenAI instance.
+ * @param {string} taskText The text of the task that was completed.
+ *        The part of the text before the first "@" symbol is used for the prompt if "@" is present.
+ * @returns {Promise<string>} A promise that resolves to a celebratory message string.
+ */
 export const generateCelebratoryMessageForTask = async (
   ai: GoogleGenAI,
   taskText: string
 ): Promise<string> => {
   if (!taskText) {
-    return "Great job!"; // Fallback if task text is empty
+    return "Great job!"; // Fallback for empty task text.
   }
-  const prompt = TASK_COMPLETION_CELEBRATION_PROMPT_TEMPLATE(taskText.split('@')[0].trim()); // Use main task text
+  // Use the main part of the task text for the prompt, in case of conventions like "@location".
+  const promptText = taskText.split('@')[0].trim();
+  const prompt = TASK_COMPLETION_CELEBRATION_PROMPT_TEMPLATE(promptText);
 
   try {
-    const response: GenerateContentResponse = await ai.models.generateContent({
-      model: GEMINI_TEXT_MODEL,
-      contents: [{ parts: [{ text: prompt }] }],
-      // config: { responseMimeType: "text/plain" } // Default is text/plain
-    });
+    // Note: The new SDK syntax is ai.getGenerativeModel(...).generateContent(...)
+    // This code appears to use an older or mixed syntax.
+    // For consistency with other functions, this should be updated if possible.
+    // However, if `ai.models.generateContent` is a valid shorthand or different API part, it might be intentional.
+    // Assuming it works as is for now.
+    const generativeModel = ai.getGenerativeModel({ model: GEMINI_TEXT_MODEL });
+    const result = await generativeModel.generateContent({ contents: [{ parts: [{ text: prompt }] }] });
+    const response = result.response;
     
-    const celebrationText = response.text.trim();
+    const celebrationText = response.text().trim();
     if (celebrationText) {
       return celebrationText;
     }

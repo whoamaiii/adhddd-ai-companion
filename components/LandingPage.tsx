@@ -1,9 +1,21 @@
 import React from 'react';
 
+/**
+ * Props for the LandingPage component.
+ */
 interface LandingPageProps {
+  /** Callback function to be invoked when the user clicks the 'Launch' button for the cleaning tool. */
   onLaunchCleaningTool: () => void;
 }
 
+/**
+ * LandingPage component.
+ * Displays an introduction to the application and provides a way to launch available tools.
+ * Currently features the "ADHD-Clean Hjelper" tool and a placeholder for future tools.
+ *
+ * @param {LandingPageProps} props - The properties for the component.
+ * @returns {JSX.Element} The rendered landing page.
+ */
 export const LandingPage: React.FC<LandingPageProps> = ({ onLaunchCleaningTool }) => {
   return (
     <>

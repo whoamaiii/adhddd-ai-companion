@@ -1,13 +1,29 @@
 import React, { useRef, useEffect, useCallback } from 'react';
 
+/**
+ * Props for the AudioVisualizer component.
+ */
 interface AudioVisualizerProps {
+  /** The Web Audio API GainNode for input audio (e.g., microphone). Visualized when listening. */
   inputNode: GainNode | null;
+  /** The Web Audio API GainNode for output audio (e.g., speech synthesis). Visualized when speaking. */
   outputNode: GainNode | null;
+  /** The current state of audio interaction, determining the visual displayed. */
   visualState: 'idle' | 'listening' | 'processing' | 'speaking' | 'error';
+  /** Optional width of the canvas. Defaults to 280. */
   width?: number;
+  /** Optional height of the canvas. Defaults to 120. */
   height?: number;
 }
 
+/**
+ * A React component that visualizes audio activity on a canvas.
+ * It can show different animations based on the `visualState` prop,
+ * including waveforms for input/output audio, idle animations, processing indicators, and error states.
+ *
+ * @param {AudioVisualizerProps} props - The properties for the component.
+ * @returns {JSX.Element} A canvas element used for audio visualization.
+ */
 export const AudioVisualizer: React.FC<AudioVisualizerProps> = ({
   inputNode,
   outputNode,
@@ -22,8 +38,8 @@ export const AudioVisualizer: React.FC<AudioVisualizerProps> = ({
   const inputDataArrayRef = useRef<Uint8Array | null>(null);
   const outputDataArrayRef = useRef<Uint8Array | null>(null);
   
-  // Performance optimization for mobile
-  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  /** Helper to detect mobile user agents for performance optimizations (e.g., lower FPS). */
+  const isMobile = typeof navigator !== 'undefined' && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
   const targetFPS = isMobile ? 30 : 60;
   const frameInterval = 1000 / targetFPS;
   let lastFrameTime = 0;
@@ -60,6 +76,14 @@ export const AudioVisualizer: React.FC<AudioVisualizerProps> = ({
     };
   }, [inputNode, outputNode]);
 
+  /**
+   * Draws a waveform on the canvas based on audio data.
+   * @param {CanvasRenderingContext2D} ctx - The canvas rendering context.
+   * @param {Uint8Array} dataArray - The array of audio data (time domain).
+   * @param {string} color - The color of the waveform.
+   * @param {number} yOffset - The vertical offset for drawing the waveform.
+   * @param {number} [heightMultiplier=1] - A multiplier for the waveform's amplitude.
+   */
   const drawWaveform = useCallback((
     ctx: CanvasRenderingContext2D,
     dataArray: Uint8Array,
@@ -89,6 +113,11 @@ export const AudioVisualizer: React.FC<AudioVisualizerProps> = ({
     ctx.stroke();
   }, []);
 
+  /**
+   * Draws an idle state animation (e.g., breathing circles) on the canvas.
+   * @param {CanvasRenderingContext2D} ctx - The canvas rendering context.
+   * @param {number} time - The current time, used for animation progression.
+   */
   const drawIdleAnimation = useCallback((ctx: CanvasRenderingContext2D, time: number) => {
     const width = ctx.canvas.width;
     const height = ctx.canvas.height;
@@ -113,6 +142,10 @@ export const AudioVisualizer: React.FC<AudioVisualizerProps> = ({
     ctx.stroke();
   }, []);
 
+  /**
+   * Draws an error state indicator (e.g., a red 'X') on the canvas.
+   * @param {CanvasRenderingContext2D} ctx - The canvas rendering context.
+   */
   const drawErrorState = useCallback((ctx: CanvasRenderingContext2D) => {
     const width = ctx.canvas.width;
     const height = ctx.canvas.height;
@@ -130,7 +163,14 @@ export const AudioVisualizer: React.FC<AudioVisualizerProps> = ({
     ctx.stroke();
   }, []);
 
+  /**
+   * The main animation loop callback.
+   * Clears the canvas and draws the appropriate visualization based on `visualState`.
+   * Throttles rendering to `targetFPS`.
+   * @param {number} currentTime - The current time provided by `requestAnimationFrame`.
+   */
   const animate = useCallback((currentTime: number) => {
+    // Throttle FPS
     if (currentTime - lastFrameTime < frameInterval) {
       animationRef.current = requestAnimationFrame(animate);
       return;

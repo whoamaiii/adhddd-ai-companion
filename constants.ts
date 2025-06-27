@@ -1,8 +1,20 @@
 
-export const GEMINI_TEXT_MODEL = "gemini-2.5-flash-preview-04-17"; // For text generation and multimodal analysis
-export const GEMINI_IMAGE_MODEL = "imagen-3.0-generate-002"; // If specific image generation were needed
-export const MAX_FILE_SIZE_MB = 5; // Max image file size in MB
+/** @constant {string} GEMINI_TEXT_MODEL The specific Gemini model used for text generation and multimodal analysis. */
+export const GEMINI_TEXT_MODEL = "gemini-2.5-flash-preview-04-17";
 
+/** @constant {string} GEMINI_IMAGE_MODEL Placeholder for a specific Gemini model if image generation were needed. Currently not used for generation in this app. */
+export const GEMINI_IMAGE_MODEL = "imagen-3.0-generate-002";
+
+/** @constant {number} MAX_FILE_SIZE_MB Maximum allowed image file size in megabytes for upload. */
+export const MAX_FILE_SIZE_MB = 5;
+
+/**
+ * @constant {string} INITIAL_ANALYSIS_PROMPT
+ * Prompt for Gemini to analyze images of messy rooms.
+ * Instructs the AI to identify clutter, focus on actionable items, and return observations
+ * as a JSON array of objects, each with a "description" field.
+ * This structure is crucial for `parseJsonFromGeminiResponse` to correctly process the output.
+ */
 export const INITIAL_ANALYSIS_PROMPT = `
 You are an expert at analyzing images of messy rooms to help someone with ADHD clean.
 Given the image, identify key objects, their locations, and general areas of clutter.
@@ -16,6 +28,19 @@ Example output format:
 ]
 `;
 
+/**
+ * Generates a prompt for Gemini to create a cleaning plan based on observations.
+ *
+ * @param {string} observationsText A string containing newline-separated observations from the image analysis.
+ * @returns {string} A formatted prompt string for the AI.
+ * This prompt guides the AI to:
+ * - Act as an ADHD productivity coach.
+ * - Create a step-by-step plan using the provided observations.
+ * - Optimize the plan for ADHD brains (easy wins, small tasks, encouraging tone, focus).
+ * - Structure the output as a JSON array of objects, where each object represents a task
+ *   and includes "text", "estimated_time", "difficulty_level", and optional "prioritization_hint".
+ * This JSON structure is critical for `parseJsonFromGeminiResponse` and subsequent processing in `App.tsx`.
+ */
 export const TASK_GENERATION_PROMPT_TEMPLATE = (observationsText: string): string => `
 You are an ADHD productivity coach specializing in creating cleaning plans.
 Based on the following observations of a messy space:
@@ -64,6 +89,17 @@ Example:
 ]
 `;
 
+/**
+ * Generates a prompt for Gemini to create a celebratory message upon task completion.
+ *
+ * @param {string} taskText The text of the completed task.
+ * @returns {string} A formatted prompt string for the AI.
+ * This prompt asks the AI to:
+ * - Act as an ADHD productivity coach.
+ * - Generate a short, positive, and varied celebratory remark for the completed task.
+ * - Keep the message natural, encouraging, and avoid complex language.
+ * - Respond with only the celebratory message (plain text expected).
+ */
 export const TASK_COMPLETION_CELEBRATION_PROMPT_TEMPLATE = (taskText: string): string => `
 You are an ADHD productivity coach. The user just completed the following task: "${taskText}".
 Generate a short (1-2 sentences), positive, and slightly varied celebratory remark related to this completed task.

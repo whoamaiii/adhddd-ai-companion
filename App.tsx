@@ -12,28 +12,60 @@ import { AppScreen } from './types';
 import type { Task, ImageAnalysisObservation } from './types';
 import { analyzeImageWithGemini, generateCleaningPlanWithGemini, generateCelebratoryMessageForTask } from './services/geminiService';
 import { v4 as uuidv4 } from 'uuid';
+import { getDisplayTaskText } from './components/utils';
 
+/**
+ * Main application component.
+ * Manages application state, including API key, current screen, tasks,
+ * image analysis, loading/error states, and user settings (voice, gamification).
+ * Handles core logic for image uploading, AI interaction for analysis and task generation,
+ * task management (add, complete, reorder), and voice feedback.
+ */
 const App: React.FC = () => {
+  // ------------- State Variables -------------
+  /** @state {string | null} apiKey - The API key for Gemini AI services. */
   const [apiKey, setApiKey] = useState<string | null>(null);
+  /** @state {AppScreen} currentScreen - The currently displayed screen in the application. */
   const [currentScreen, setCurrentScreen] = useState<AppScreen>(AppScreen.Home);
+  /** @state {string[] | null} uploadedImages - Array of base64 encoded uploaded image data URLs. Setter is used directly. */
   const [, setUploadedImages] = useState<string[] | null>(null);
+  /** @state {ImageAnalysisObservation[]} imageAnalysis - Array of observations from AI image analysis. Setter is used directly. */
   const [, setImageAnalysis] = useState<ImageAnalysisObservation[]>([]);
+  /** @state {Task[]} tasks - Array of tasks for the user to complete. */
   const [tasks, setTasks] = useState<Task[]>([]);
+  /** @state {boolean} isLoading - Flag indicating if the application is currently in a loading state. */
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  /** @state {string | null} error - Error message string if an error occurs, null otherwise. */
   const [error, setError] = useState<string | null>(null);
+  /** @state {number} currentTaskIndex - Index of the currently focused task in the `tasks` array. */
   const [currentTaskIndex, setCurrentTaskIndex] = useState<number>(0);
+  /** @state {string | null} draggingItemId - ID of the task item currently being dragged. */
   const [draggingItemId, setDraggingItemId] = useState<string | null>(null);
 
+  /** @state {boolean} enableVoice - Flag to enable or disable voice assistance (text-to-speech). */
   const [enableVoice, setEnableVoice] = useState<boolean>(false);
+  /** @state {boolean} enableGamification - Flag to enable or disable gamification features (e.g., streak counter). */
   const [enableGamification, setEnableGamification] = useState<boolean>(true);
+  /** @state {number} streak - Current task completion streak for gamification. */
   const [streak, setStreak] = useState<number>(0);
 
-  const [lastCommandFeedback, ] = useState<string>('');
+  /** @state {string} lastCommandFeedback - Feedback message from voice commands (currently not fully implemented for input). */
+  const [lastCommandFeedback, ] = useState<string>(''); // Setter not used yet, implies future use or removal.
 
+  // ------------- General Callbacks -------------
+  /**
+   * Navigates to the image upload screen.
+   * @callback
+   */
   const handleLaunchCleaningTool = useCallback(() => {
     setCurrentScreen(AppScreen.ImageUpload);
   }, []);
 
+  /**
+   * Speaks the given text using browser's speech synthesis, if enabled.
+   * @callback
+   * @param {string} text - The text to be spoken.
+   */
   const speak = useCallback((text: string) => {
     if (enableVoice && 'speechSynthesis' in window) {
       window.speechSynthesis.cancel(); // Cancel any previous speech
@@ -42,6 +74,12 @@ const App: React.FC = () => {
     }
   }, [enableVoice]);
 
+  // ------------- Task Management Callbacks -------------
+  /**
+   * Adds a new task to the task list.
+   * @callback
+   * @param {string} taskText - The text for the new task.
+   */
   const handleAddTask = useCallback((taskText: string) => {
     if (!taskText.trim()) return;
 
@@ -60,74 +98,111 @@ const App: React.FC = () => {
       }
       return updatedTasks;
     });
-    speak(`Added task: ${newTask.text.split('@')[0].trim()}`);
+    speak(`Added task: ${getDisplayTaskText(newTask.text)}`);
   }, [currentTaskIndex, speak]);
 
+  /**
+   * Generates an AI-powered celebratory message for a completed task and speaks it.
+   * Falls back to a generic message if AI generation fails or is not available.
+   * @callback
+   * @param {string} taskText - The text of the completed task.
+   */
+  const generateAndSpeakAiCelebration = useCallback(async (taskText: string) => {
+    let celebrationMessage = `Great job completing: ${getDisplayTaskText(taskText)}`;
+    if (apiKey && taskText) {
+      try {
+        const ai = new GoogleGenAI({ apiKey });
+        // Pass the full taskText to the AI, as it might contain context beyond the display text (e.g. after '@')
+        const aiCelebration = await generateCelebratoryMessageForTask(ai, taskText);
+        if (aiCelebration) {
+          celebrationMessage = aiCelebration;
+        }
+      } catch (e) {
+        console.error("Failed to get AI celebratory message:", e);
+        // Fallback to the generic message (already set) if AI fails.
+      }
+    }
+    speak(celebrationMessage);
+  }, [apiKey, speak]);
+
+  /**
+   * Finds the index of the next incomplete task in a given list of tasks,
+   * starting the search after the `completedTaskId`.
+   * @callback
+   * @param {Task[]} updatedTasks - The array of tasks to search within.
+   * @param {string} completedTaskId - The ID of the task that was just completed.
+   * @returns {number} The index of the next incomplete task, or -1 if all are completed.
+   */
+  const findNextIncompleteTaskIndex = useCallback((updatedTasks: Task[], completedTaskId: string): number => {
+    let searchStartIndex = updatedTasks.findIndex((task: Task) => task.id === completedTaskId);
+    // Should not happen if called correctly, but provides a fallback.
+    if (searchStartIndex === -1) searchStartIndex = 0;
+
+    for (let i = 0; i < updatedTasks.length; i++) {
+      const checkIndex = (searchStartIndex + 1 + i) % updatedTasks.length; // Wrap around search
+      if (!updatedTasks[checkIndex].isCompleted) {
+        return checkIndex;
+      }
+    }
+    return -1; // All tasks are completed or no incomplete task found.
+  }, []);
+
+  /**
+   * Handles the completion of a task.
+   * Marks the task as completed, triggers a celebratory message,
+   * updates gamification streaks, and navigates to the next task or completion screen.
+   * @callback
+   * @param {string} taskId - The ID of the task to be marked as complete.
+   */
   const handleTaskComplete = useCallback(async (taskId: string) => {
-    let completedTaskTextForAISpeech = "";
+    let completedTaskText = ""; // Store the text of the completed task for celebration.
     const updatedTasks = tasks.map((task: Task) => {
       if (task.id === taskId) {
-        completedTaskTextForAISpeech = task.text;
+        completedTaskText = task.text;
         return { ...task, isCompleted: true };
       }
       return task;
     });
     setTasks(updatedTasks);
 
-    // AI Celebration message
-    let celebrationMessage = `Great job completing: ${completedTaskTextForAISpeech.split('@')[0].trim()}`;
-    if (apiKey && completedTaskTextForAISpeech) {
-      try {
-        const ai = new GoogleGenAI({ apiKey });
-        const aiCelebration = await generateCelebratoryMessageForTask(ai, completedTaskTextForAISpeech);
-        if (aiCelebration) {
-          celebrationMessage = aiCelebration;
-        }
-      } catch (e) {
-        console.error("Failed to get AI celebratory message:", e);
-        // Fallback to generic message is already set
-      }
+    if (completedTaskText) {
+      await generateAndSpeakAiCelebration(completedTaskText);
     }
-    speak(celebrationMessage);
     
     const allTasksNowCompleted = updatedTasks.every((task: Task) => task.isCompleted);
 
     if (allTasksNowCompleted) {
-        speak("Fantastic! You've completed all tasks for this area!");
-        if (enableGamification) {
-            setStreak((s: number) => s + 1);
-        }
-        setCurrentScreen(AppScreen.AllTasksCompleted);
-    } else {
-      let nextIncompleteTaskIndex = -1;
-      let searchStartIndex = tasks.findIndex((task: Task) => task.id === taskId);
-      if (searchStartIndex === -1) searchStartIndex = 0;
-
-      for (let i = 0; i < updatedTasks.length; i++) {
-        const checkIndex = (searchStartIndex + 1 + i) % updatedTasks.length;
-        if (!updatedTasks[checkIndex].isCompleted) {
-            nextIncompleteTaskIndex = checkIndex;
-            break;
-        }
+      speak("Fantastic! You've completed all tasks for this area!");
+      if (enableGamification) {
+        setStreak((s: number) => s + 1); // Increment streak
       }
+      setCurrentScreen(AppScreen.AllTasksCompleted);
+    } else {
+      const nextIncompleteTaskIndex = findNextIncompleteTaskIndex(updatedTasks, taskId);
       
       if (nextIncompleteTaskIndex !== -1) {
+        // Delay setting the next task to allow completion animation/feedback to be perceived.
         setTimeout(() => {
           setCurrentTaskIndex(nextIncompleteTaskIndex);
-          // Speak for next task is handled by useEffect
+          // Speaking for the next task is handled by a separate useEffect hook.
         }, 500); 
       } else { 
+        // This case should ideally be covered by `allTasksNowCompleted`,
+        // but acts as a safeguard if somehow an incomplete task isn't found.
         speak("Looks like that was the last one! Amazing!");
-         if (enableGamification) {
-            setStreak((s: number) => s + 1);
+        if (enableGamification) {
+          setStreak((s: number) => s + 1);
         }
         setCurrentScreen(AppScreen.AllTasksCompleted);
       }
     }
-  }, [tasks, speak, enableGamification, apiKey]);
+  }, [tasks, apiKey, speak, enableGamification, generateAndSpeakAiCelebration, findNextIncompleteTaskIndex]);
 
-
-
+  // ------------- Effects -------------
+  /**
+   * Effect to initialize the API key from environment variables on component mount.
+   * Sets an error state if the API key is not found.
+   */
   useEffect(() => {
     const keyFromEnv = import.meta.env.VITE_GEMINI_API_KEY;
     if (keyFromEnv) {
@@ -139,6 +214,13 @@ const App: React.FC = () => {
     }
   }, []);
 
+  /**
+   * Handles the image upload process.
+   * Validates API key and image data, then calls AI services for image analysis and task plan generation.
+   * Updates application state with results, loading status, and errors.
+   * @callback
+   * @param {string[]} imageDataUrls - An array of base64 encoded image data URLs.
+   */
   const handleImageUpload = useCallback(async (imageDataUrls: string[]) => {
     if (!apiKey) {
       setError("API Key is not configured. Cannot proceed. Ensure VITE_GEMINI_API_KEY is set.");
@@ -147,9 +229,11 @@ const App: React.FC = () => {
     }
     if (imageDataUrls.length === 0) {
       setError("No images were provided for analysis.");
+      // Consider returning to ImageUpload screen or showing a dismissible message
       return; 
     }
-    setUploadedImages(imageDataUrls);
+
+    setUploadedImages(imageDataUrls); // Store raw image data (setter only)
     setIsLoading(true);
     setError(null);
     setCurrentScreen(AppScreen.Processing);
@@ -157,53 +241,70 @@ const App: React.FC = () => {
     try {
       const ai = new GoogleGenAI({ apiKey });
       const analysisResults = await analyzeImageWithGemini(ai, imageDataUrls);
-      setImageAnalysis(analysisResults);
+      setImageAnalysis(analysisResults); // Store analysis results (setter only)
 
       if (analysisResults.length === 0) {
-        setError("The AI could not identify actionable items from the image(s). Try a different view or image.");
-        setCurrentScreen(AppScreen.ImageUpload);
-        setUploadedImages(null);
+        setError("The AI could not identify actionable items from the image(s). Try a different view or image, or add tasks manually.");
+        setCurrentScreen(AppScreen.ImageUpload); // Go back to allow new uploads or manual additions
+        setUploadedImages(null); // Clear images
         setIsLoading(false);
         return;
       }
 
-      const plan : Partial<Task>[] = await generateCleaningPlanWithGemini(ai, analysisResults);
+      const plan: Partial<Task>[] = await generateCleaningPlanWithGemini(ai, analysisResults);
       const tasksWithIds: Task[] = plan.map(taskDetails => ({
         id: uuidv4(),
-        text: taskDetails.text || "Unnamed task",
+        text: taskDetails.text || "Unnamed task from AI", // Provide clearer default
         isCompleted: false,
         estimatedTime: taskDetails.estimatedTime,
         difficulty: taskDetails.difficulty,
         prioritizationHint: taskDetails.prioritizationHint,
       }));
+
       setTasks(tasksWithIds);
-      setCurrentTaskIndex(0);
+      setCurrentTaskIndex(0); // Focus the first task
       setCurrentScreen(AppScreen.Tasks);
     } catch (err) {
       console.error("Error processing image(s) or generating plan:", err);
-      setError(err instanceof Error ? err.message : "An unknown error occurred during AI processing.");
-      setCurrentScreen(AppScreen.Error);
+      const errorMessage = err instanceof Error ? err.message : "An unknown error occurred during AI processing. Please try again.";
+      setError(errorMessage);
+      setCurrentScreen(AppScreen.Error); // Navigate to a generic error screen
     } finally {
       setIsLoading(false);
     }
-  }, [apiKey]);
+  }, [apiKey]); // Dependencies: only apiKey, as setters are stable.
 
+  /**
+   * Resets the application to the image upload screen, clearing current tasks and analysis.
+   * @callback
+   */
   const handleReset = () => {
     setUploadedImages(null);
     setImageAnalysis([]);
     setTasks([]);
     setError(null);
-    setCurrentTaskIndex(0);
+    setCurrentTaskIndex(0); // Reset task focus
     setCurrentScreen(AppScreen.ImageUpload);
     speak("Let's tackle a new area!");
   };
   
+  /**
+   * Effect to speak the current task when it changes or voice is enabled/disabled,
+   * provided the current screen is the Tasks screen and the task is not completed.
+   */
   useEffect(() => {
     if (enableVoice && currentScreen === AppScreen.Tasks && tasks.length > 0 && tasks[currentTaskIndex] && !tasks[currentTaskIndex].isCompleted) {
-      speak(`Current task: ${tasks[currentTaskIndex].text.split('@')[0].trim()}`);
+      speak(`Current task: ${getDisplayTaskText(tasks[currentTaskIndex].text)}`);
     }
-  }, [currentTaskIndex, tasks, currentScreen, speak, enableVoice]);
+  }, [currentTaskIndex, tasks, currentScreen, speak, enableVoice]); // speak is memoized
 
+  /**
+   * Handles reordering of tasks in the list via drag-and-drop.
+   * Updates the tasks array and attempts to maintain the focused task's visibility.
+   * @callback
+   * @param {string} draggedTaskId - The ID of the task being dragged.
+   * @param {string} targetTaskId - The ID of the task over which the dragged task is dropped.
+   */
   const handleTaskReorder = (draggedTaskId: string, targetTaskId: string) => {
     const currentFocusedTaskId = tasks[currentTaskIndex]?.id;
     

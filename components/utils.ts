@@ -107,3 +107,16 @@ function floatTo16BitPCM(output: DataView, offset: number, input: Float32Array) 
     output.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
   }
 }
+
+/**
+ * Extracts the main part of a task text, typically before an "@" symbol.
+ * Also trims whitespace.
+ * @param {string | undefined} taskText The full task text.
+ * @returns {string} The processed task text, or an empty string if input is undefined or null.
+ */
+export function getDisplayTaskText(taskText: string | undefined): string {
+  if (!taskText) {
+    return "";
+  }
+  return taskText.split('@')[0].trim();
+}
