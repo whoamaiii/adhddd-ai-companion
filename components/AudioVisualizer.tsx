@@ -165,7 +165,7 @@ export const AudioVisualizer: React.FC<AudioVisualizerProps> = ({
         }
         break;
         
-      case 'processing':
+      case 'processing': {
         // Processing animation - rotating dots
         const dotCount = 8;
         const centerX = canvas.width / 2;
@@ -184,6 +184,7 @@ export const AudioVisualizer: React.FC<AudioVisualizerProps> = ({
           ctx.fill();
         }
         break;
+      }
         
       case 'error':
         drawErrorState(ctx);

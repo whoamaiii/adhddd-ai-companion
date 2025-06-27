@@ -6,16 +6,18 @@ import { TaskList } from './components/TaskList';
 import { LoadingSpinner } from './components/LoadingSpinner';
 import { SettingsPanel } from './components/SettingsPanel';
 import { MessageCard } from './components/MessageCard';
+import { LandingPage } from './components/LandingPage';
+import Footer from './components/Footer';
 import { AppScreen } from './types';
-import type { Task, ImageAnalysisObservation, GeminiTaskResponseItem } from './types';
+import type { Task, ImageAnalysisObservation } from './types';
 import { analyzeImageWithGemini, generateCleaningPlanWithGemini, generateCelebratoryMessageForTask } from './services/geminiService';
 import { v4 as uuidv4 } from 'uuid';
 
 const App: React.FC = () => {
   const [apiKey, setApiKey] = useState<string | null>(null);
-  const [currentScreen, setCurrentScreen] = useState<AppScreen>(AppScreen.Welcome);
-  const [uploadedImages, setUploadedImages] = useState<string[] | null>(null);
-  const [imageAnalysis, setImageAnalysis] = useState<ImageAnalysisObservation[]>([]);
+  const [currentScreen, setCurrentScreen] = useState<AppScreen>(AppScreen.Home);
+  const [, setUploadedImages] = useState<string[] | null>(null);
+  const [, setImageAnalysis] = useState<ImageAnalysisObservation[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -26,7 +28,11 @@ const App: React.FC = () => {
   const [enableGamification, setEnableGamification] = useState<boolean>(true);
   const [streak, setStreak] = useState<number>(0);
 
-  const [lastCommandFeedback, setLastCommandFeedback] = useState<string>('');
+  const [lastCommandFeedback, ] = useState<string>('');
+
+  const handleLaunchCleaningTool = useCallback(() => {
+    setCurrentScreen(AppScreen.ImageUpload);
+  }, []);
 
   const speak = useCallback((text: string) => {
     if (enableVoice && 'speechSynthesis' in window) {
@@ -126,7 +132,6 @@ const App: React.FC = () => {
     const keyFromEnv = import.meta.env.VITE_GEMINI_API_KEY;
     if (keyFromEnv) {
       setApiKey(keyFromEnv);
-      setCurrentScreen(AppScreen.ImageUpload); 
     } else {
       console.error("API Key not found in import.meta.env.VITE_GEMINI_API_KEY. The app will not function correctly.");
       setError("CRITICAL: API Key is not configured. Please ensure the VITE_GEMINI_API_KEY environment variable is set correctly in your .env.local file and that the application has been rebuilt/restarted if changes were made. The application cannot operate without it.");
@@ -245,6 +250,8 @@ const App: React.FC = () => {
     }
 
     switch (currentScreen) {
+      case AppScreen.Home:
+        return <LandingPage onLaunchCleaningTool={handleLaunchCleaningTool} />;
       case AppScreen.ImageUpload:
         return <ImageUploader onImageUpload={handleImageUpload} />;
       case AppScreen.Tasks:
@@ -307,10 +314,13 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center p-4 selection:bg-sky-200 selection:text-sky-900" style={{backgroundColor: 'var(--bg-page)'}}>
-      <Header title="ADHD Cleaning Companion" streak={enableGamification ? streak : undefined} />
-      <main className="container mx-auto mt-2 md:mt-6 p-0 md:p-2 bg-[var(--bg-card)] rounded-xl shadow-xl w-full max-w-2xl mb-24">
-        {renderContent()}
+    <div className="relative flex size-full min-h-screen flex-col justify-between group/design-root overflow-x-hidden bg-[var(--background-primary)] dark">
+      <Header streak={enableGamification ? streak : undefined} />
+      
+      <main className="flex-grow">
+        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+          {renderContent()}
+        </div>
       </main>
 
       {/* Voice Command Feedback */}
@@ -326,19 +336,21 @@ const App: React.FC = () => {
       <SettingsPanel
         enableVoice={enableVoice}
         onToggleVoice={() => {
-            const newVoiceState = !enableVoice;
-            setEnableVoice(newVoiceState);
-            setTimeout(() => { // Ensure state update before speaking
-                if (newVoiceState) speak("Voice assistance enabled.");
-                else { if (window.speechSynthesis) window.speechSynthesis.cancel(); } 
-            }, 0);
+            setEnableVoice(prev => {
+                const newState = !prev;
+                if (newState) {
+                    speak("Voice assistance enabled.");
+                } else {
+                    window.speechSynthesis.cancel();
+                }
+                return newState;
+            });
         }}
         enableGamification={enableGamification}
         onToggleGamification={() => setEnableGamification(g => !g)}
       />
-      <footer className="text-center text-[var(--text-secondary)] mt-8 text-sm pb-4">
-        <p>&copy; {new Date().getFullYear()} AI Cleaning Assistant. Powered by Gemini.</p>
-      </footer>
+      
+      <Footer />
     </div>
   );
 };

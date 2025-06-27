@@ -11,39 +11,58 @@
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&family=Noto+Sans:wght@400;500;700;900&display=swap" rel="stylesheet"/>
     <style type="text/tailwindcss">
       :root {
-        --primary-color: #3dc6f4; /* Light blue from mockups */
-        --secondary-color: #00a9e2; /* Darker blue */
-        --accent-color: #007aff; /* Apple system blue */
-        
-        --text-primary: #1d1d1f; /* Near black for text */
-        --text-secondary: #6e6e73; /* Medium gray for secondary text */
-        --text-dark-gray: #374151; /* From header mockup */
-        --text-medium-gray: #6B7280; /* From header mockup */
-        
-        --bg-page: #f5f5f7; /* Light gray for page background */
-        --bg-card: #ffffff; /* White for cards */
-        --bg-light-accent: #F0F4F8; /* Very light blue/gray accent */
-
-        --border-light: #e5e5ea; /* Light gray for borders */
-        --border-medium: #d1d5db; /* Medium gray for borders */
-
-        --success-color: #34D399; /* Green for success/completion */
-        --success-bg-light: #dcfce7;
-        --error-color: #EF4444; /* Red for errors */
-        --error-bg-light: #FEE2E2;
-        --warning-color: #F59E0B; /* Amber for warnings/streaks */
-        --warning-bg-light: #FEF3C7;
-        
-        --progress-bar-background: #e5e7eb; /* Track for progress bar */
-
-        /* Specific to components if needed */
-        --header-bg: var(--bg-card); /* Header background */
-        --header-text: var(--text-dark-gray);
+        --primary-color: #0c92f2;
+        --secondary-color: #1b2227;
+        --text-primary: #ffffff;
+        --text-secondary: #9cadba;
+        --background-primary: #111518;
+        --background-secondary: #1e293b;
+        --glass-background: rgba(255, 255, 255, 0.05);
+        --glass-border: rgba(255, 255, 255, 0.1);
+        --hover-glass-background: rgba(255, 255, 255, 0.1);
+      }
+      .dark {
+        --primary-color: #0c92f2;
+        --secondary-color: #1b2227;
+        --text-primary: #ffffff;
+        --text-secondary: #9cadba;
+        --background-primary: #111518;
+        --background-secondary: #1e293b;
+        --glass-background: rgba(255, 255, 255, 0.05);
+        --glass-border: rgba(255, 255, 255, 0.1);
+        --hover-glass-background: rgba(255, 255, 255, 0.1);
       }
       body {
-        font-family: 'Manrope', 'Noto Sans', sans-serif;
-        background-color: var(--bg-page);
-        color: var(--text-primary);
+        font-family: 'Noto Sans', sans-serif;
+        min-height: max(884px, 100dvh);
+      }
+      h1, h2, h3, h4, h5, h6 {
+        font-family: 'Manrope', sans-serif;
+      }
+      .glassmorphism-card {
+        background: var(--glass-background);
+        border: 1px solid var(--glass-border);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        transition: background 0.3s ease, border-color 0.3s ease;
+      }
+      .glassmorphism-card:hover {
+        background: var(--hover-glass-background);
+        border-color: rgba(255, 255, 255, 0.2);
+      }
+      .glassmorphism-button {
+        background: rgba(12, 146, 242, 0.2);
+        border: 1px solid rgba(12, 146, 242, 0.5);
+        backdrop-filter: blur(5px);
+        -webkit-backdrop-filter: blur(5px);
+        transition: background 0.3s ease, transform 0.2s ease-out;
+      }
+      .glassmorphism-button:hover {
+        background: rgba(12, 146, 242, 0.4);
+        transform: scale(1.03);
+      }
+      .glassmorphism-button:active {
+        transform: scale(0.98);
       }
     </style>
     <script type="importmap">

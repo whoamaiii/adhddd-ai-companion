@@ -1,4 +1,4 @@
-import { Task } from '../types/Task';
+
 
 // Voice command interface
 export interface VoiceCommand {
@@ -17,7 +17,7 @@ export interface VoiceCommand {
 export interface CommandMatch {
   command: VoiceCommand;
   confidence: number;
-  parameters?: { [key: string]: any };
+  parameters?: { [key: string]: Record<string, unknown> };
   matchedPattern: string;
   originalInput: string;
 }
@@ -518,10 +518,10 @@ export function parseVoiceCommand(input: string): CommandMatch | null {
 }
 
 // Extract parameters from voice input
-function extractParameters(input: string, command: VoiceCommand): { [key: string]: any } | undefined {
+function extractParameters(input: string, command: VoiceCommand): { [key: string]: Record<string, unknown> } | undefined {
   if (!command.parameters) return undefined;
 
-  const parameters: { [key: string]: any } = {};
+  const parameters: { [key: string]: Record<string, unknown> } = {};
 
   // For add task command, extract the task title
   if (command.id === 'add-task') {
@@ -576,7 +576,7 @@ export function getCommandSuggestions(partialInput: string, limit: number = 5): 
 }
 
 // Validate command execution context
-export function canExecuteCommand(command: VoiceCommand, context?: any): boolean {
+export function canExecuteCommand(command: VoiceCommand, context?: Record<string, unknown>): boolean {
   // Add context-specific validation here
   // For example, can't complete task if no task is selected
   switch (command.action) {

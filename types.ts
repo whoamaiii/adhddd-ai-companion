@@ -14,6 +14,7 @@ export interface ImageAnalysisObservation {
 }
 
 export enum AppScreen {
+  Home,
   Welcome,
   ImageUpload,
   Processing, // Covers both image analysis and task generation

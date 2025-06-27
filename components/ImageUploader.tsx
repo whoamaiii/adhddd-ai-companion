@@ -110,7 +110,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({ onImageUpload }) =
       {/* Image previews grid - Mockup 4 */}
       <div className={`grid ${previews.length > 0 ? 'grid-cols-3 sm:grid-cols-4' : 'grid-cols-1'} gap-3 mb-6`}>
         {previews.map((previewUrl, index) => (
-          <div key={index} className="relative aspect-square rounded-lg overflow-hidden group border border-[var(--border-light)]">
+          <div key={index} className="relative aspect-square rounded-lg overflow-hidden group border border-[var(--glass-border)]">
             <img src={previewUrl} alt={`Preview ${index + 1}`} className="w-full h-full object-cover" />
             <button 
               onClick={() => removePreview(index)} 
@@ -125,7 +125,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({ onImageUpload }) =
         {addMoreImagesPlaceholder && (
            <button
             onClick={triggerFileInput}
-            className="flex items-center justify-center aspect-square rounded-lg border-2 border-dashed border-[var(--border-medium)] text-[var(--text-secondary)] hover:bg-[var(--bg-light-accent)] hover:border-[var(--primary-color)] hover:text-[var(--primary-color)] transition-colors cursor-pointer"
+            className="flex items-center justify-center aspect-square rounded-lg border-2 border-dashed border-[var(--glass-border)] text-[var(--text-secondary)] hover:bg-[var(--glass-background)] hover:border-[var(--primary-color)] hover:text-[var(--primary-color)] transition-colors cursor-pointer"
             aria-label="Add more images"
            >
             <i className="fas fa-plus text-2xl"></i>
@@ -146,17 +146,17 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({ onImageUpload }) =
 
 
       {fileErrors.length > 0 && (
-        <div className="my-3 text-[var(--error-color)] text-sm space-y-1 bg-[var(--error-bg-light)] p-3 rounded-md">
+        <div className="my-3 text-red-600 text-sm space-y-1 bg-red-100 p-3 rounded-md">
           {fileErrors.map((err, index) => <p key={index}><i className="fas fa-exclamation-triangle mr-1"></i> {err}</p>)}
         </div>
       )}
 
-      {previews.length > 0 && ( // Button now uses CSS vars for colors
+      {previews.length > 0 && (
         <button
           onClick={handleSubmit}
           disabled={fileErrors.length > 0}
-          className={`w-full text-white font-bold py-3 px-6 rounded-xl shadow-lg mt-4 transition duration-150 ease-in-out transform hover:scale-105 flex items-center justify-center
-            ${fileErrors.length > 0 ? 'bg-slate-400 cursor-not-allowed' : 'bg-[var(--success-color)] hover:opacity-90'}`}
+          className={`glassmorphism-button w-full h-12 px-6 text-white text-base font-semibold leading-normal shadow-md focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)] focus:ring-opacity-50 flex items-center justify-center
+            ${fileErrors.length > 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
         >
           <i className="fas fa-magic mr-2"></i> Analyze {previews.length} Image(s) and Plan
         </button>
