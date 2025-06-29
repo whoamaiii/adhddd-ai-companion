@@ -9,60 +9,114 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" integrity="sha512-Fo3rlrZj/k7ujTnHg4CGR2D7kSs0v4LLanw2qksYuRlEzO+tcaEPQogQ0KaoGN26/zrn20ImR1DfuLWnOo7aBA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&family=Noto+Sans:wght@400;500;700;900&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet"/>
     <style type="text/tailwindcss">
+      /* 
+       * =================================================================================
+       * THEME & DESIGN SYSTEM
+       * =================================================================================
+       * This is the single source of truth for all colors, fonts, and core component
+       * styles used throughout the application.
+       * =================================================================================
+       */
+
       :root {
-        --primary-color: #0c92f2;
-        --secondary-color: #1b2227;
-        --text-primary: #ffffff;
-        --text-secondary: #9cadba;
-        --background-primary: #111518;
-        --background-secondary: #1e293b;
-        --glass-background: rgba(255, 255, 255, 0.05);
-        --glass-border: rgba(255, 255, 255, 0.1);
-        --hover-glass-background: rgba(255, 255, 255, 0.1);
+        /* FONT FAMILIES */
+        --font-primary: 'Noto Sans', sans-serif;
+        --font-headings: 'Manrope', sans-serif;
+
+        /* PRIMARY THEME COLORS (DARK MODE) */
+        --background-primary: #111518; /* Deep, near-black for main background */
+        --surface-primary: #1a1f24;    /* Primary card/surface color */
+        --surface-secondary: #222831;  /* Slightly lighter surface for hover or secondary elements */
+        --border-primary: #2a3441;     /* Subtle border color for cards and inputs */
+        
+        --text-primary: #ffffff;       /* For headings and primary text */
+        --text-secondary: #9cadba;     /* For subheadings, descriptions, and less important text */
+
+        /* INTERACTIVE & ACCENT COLORS */
+        --accent-primary: #0c92f2;     /* The main brand/interactive color (buttons, links) */
+        --accent-primary-hover: #38a5f3; /* Lighter shade for hover states */
+        --shadow-primary: 0 4px 14px 0 rgba(12, 146, 242, 0.25); /* Glow/shadow for primary buttons */
+
+        /* STATE & TAG COLORS */
+        --tag-behavior: #8b5cf6;       /* Purple for behavior tags */
+        --tag-environment: #f97316;    /* Orange for environment tags */
+        --state-calm: #10b981;         /* Green for calm states */
+        --state-neutral: #f59e0b;      /* Yellow for neutral states */
+        --state-overwhelmed: #ef4444;  /* Red for overwhelmed states */
+        --success-color: #22c55e;
+        --warning-color: #f59e0b;
+        --error-color: #ef4444;
       }
-      .dark {
-        --primary-color: #0c92f2;
-        --secondary-color: #1b2227;
-        --text-primary: #ffffff;
-        --text-secondary: #9cadba;
-        --background-primary: #111518;
-        --background-secondary: #1e293b;
-        --glass-background: rgba(255, 255, 255, 0.05);
-        --glass-border: rgba(255, 255, 255, 0.1);
-        --hover-glass-background: rgba(255, 255, 255, 0.1);
-      }
+      
       body {
-        font-family: 'Noto Sans', sans-serif;
+        font-family: var(--font-primary);
+        background-color: var(--background-primary);
+        color: var(--text-primary);
         min-height: max(884px, 100dvh);
       }
+
       h1, h2, h3, h4, h5, h6 {
-        font-family: 'Manrope', sans-serif;
+        font-family: var(--font-headings);
       }
-      .glassmorphism-card {
-        background: var(--glass-background);
-        border: 1px solid var(--glass-border);
-        backdrop-filter: blur(10px);
-        -webkit-backdrop-filter: blur(10px);
-        transition: background 0.3s ease, border-color 0.3s ease;
+
+      /* 
+       * =================================================================================
+       * REUSABLE COMPONENT STYLES
+       * These are the building blocks for creating a consistent UI.
+       * =================================================================================
+       */
+
+      /**
+       * .card-base
+       * The standard container for all widgets, list items, and content blocks.
+       */
+      .card-base {
+        background-color: var(--surface-primary);
+        border: 1px solid var(--border-primary);
+        border-radius: 1rem; /* 16px */
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
       }
-      .glassmorphism-card:hover {
-        background: var(--hover-glass-background);
-        border-color: rgba(255, 255, 255, 0.2);
+
+      /**
+       * .interactive-item
+       * Apply to any element that the user can click/tap for a consistent feel.
+       * Use alongside .card-base for clickable cards.
+       */
+      .interactive-item {
+        transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out, border-color 0.2s ease-in-out;
       }
-      .glassmorphism-button {
-        background: rgba(12, 146, 242, 0.2);
-        border: 1px solid rgba(12, 146, 242, 0.5);
-        backdrop-filter: blur(5px);
-        -webkit-backdrop-filter: blur(5px);
-        transition: background 0.3s ease, transform 0.2s ease-out;
+      
+      .interactive-item:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+        border-color: var(--accent-primary);
       }
-      .glassmorphism-button:hover {
-        background: rgba(12, 146, 242, 0.4);
-        transform: scale(1.03);
+      
+      .interactive-item:active {
+        transform: translateY(0px) scale(0.98);
+        box-shadow: none;
       }
-      .glassmorphism-button:active {
-        transform: scale(0.98);
+      
+      /**
+       * .tag-pill
+       * For displaying small, pill-shaped tags (e.g., behaviors, environment).
+       */
+      .tag-pill {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.25rem 0.75rem;
+        border-radius: 9999px;
+        font-size: 0.875rem;
+        font-weight: 500;
+        color: var(--text-primary);
+      }
+      
+      /* DEPRECATED STYLES - These will be removed once all components are updated */
+      .glassmorphism-card, .section-heading, .icon-label-button, .state-control-container {
+        /* Styles are now handled by Tailwind classes within the components themselves */
       }
     </style>
     <script type="importmap">

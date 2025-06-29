@@ -21,6 +21,10 @@ export enum AppScreen {
   Tasks,
   AllTasksCompleted,
   Error,
+  // Sensory & Feeling Tracker screens
+  LogMoment,
+  Timeline,
+  Dashboard,
 }
 
 // For Gemini responses
@@ -29,4 +33,14 @@ export interface GeminiTaskResponseItem {
   estimated_time?: string;
   difficulty_level?: 'easy' | 'medium' | 'hard';
   prioritization_hint?: string;
+}
+
+// Sensory & Feeling Tracker types
+export interface SensoryMoment {
+  id: string;
+  timestamp: number;
+  behaviors: string[];
+  environment: string[];
+  overallState: number; // 1-5 from Calm to Overwhelmed
+  contextNote?: string;
 }

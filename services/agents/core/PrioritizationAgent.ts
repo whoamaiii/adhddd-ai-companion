@@ -1,6 +1,14 @@
 import { BaseAgent, AgentContext, AgentResponse, AgentCategory, AgentConfig } from '../AgentTypes';
 
+/**
+ * The PrioritizationAgent helps users decide which tasks to focus on first.
+ * It analyzes tasks based on factors like potential for a quick win, visible impact,
+ * and safety concerns to suggest an optimal starting point.
+ */
 export class PrioritizationAgent extends BaseAgent {
+  /**
+   * Creates an instance of PrioritizationAgent.
+   */
   constructor() {
     const config: AgentConfig = {
       id: 'prioritization',
@@ -28,15 +36,25 @@ export class PrioritizationAgent extends BaseAgent {
     super(config);
   }
 
+  /**
+   * Determines if the agent can provide help based on the number of tasks and user behavior.
+   * @param context The current agent context.
+   * @returns True if the agent can help, otherwise false.
+   */
   canHelp(context: AgentContext): boolean {
     const hasManyTasks = context.allTasks && context.allTasks.length > 3;
     const atStartOfSession = context.completedTasksCount === 0;
-    const indecisive = context.sessionHistory && 
+    const indecisive = context.sessionHistory &&
                       context.sessionHistory.filter(h => h.type === 'task_skipped').length > 2;
     
-    return hasManyTasks && (atStartOfSession || indecisive);
+    return !!(hasManyTasks && (atStartOfSession || indecisive));
   }
 
+  /**
+   * Analyzes tasks to create a priority matrix and offers a top recommendation.
+   * @param context The current agent context.
+   * @returns An AgentResponse with a suggested task, or null if it can't help.
+   */
   async analyze(context: AgentContext): Promise<AgentResponse | null> {
     if (!this.canHelp(context)) return null;
 
@@ -59,25 +77,21 @@ export class PrioritizationAgent extends BaseAgent {
     );
   }
 
+  /**
+   * Scores tasks based on a set of heuristics.
+   * @param tasks An array of tasks to analyze.
+   * @returns A map of task IDs to their priority scores.
+   */
   private analyzePriorities(tasks: any[]): Map<string, number> {
     const scores = new Map<string, number>();
     
     tasks.forEach(task => {
       let score = 0;
       
-      // Quick wins get higher priority
       if (this.isQuickWin(task)) score += 30;
-      
-      // Visible impact tasks
       if (this.hasVisibleImpact(task)) score += 25;
-      
-      // Safety/hygiene tasks
       if (this.isSafetyRelated(task)) score += 40;
-      
-      // Tasks that unlock other tasks
       if (this.isBlocker(task, tasks)) score += 35;
-      
-      // Energy-appropriate tasks
       if (this.matchesEnergyLevel(task)) score += 20;
       
       scores.set(task.id, score);
@@ -86,40 +100,69 @@ export class PrioritizationAgent extends BaseAgent {
     return scores;
   }
 
+  /**
+   * Checks if a task is a "quick win" based on keywords.
+   * @param task The task to check.
+   * @returns True if the task is a quick win, otherwise false.
+   */
   private isQuickWin(task: any): boolean {
     const quickKeywords = ['pick up', 'throw away', 'quick', 'small', 'few'];
-    return quickKeywords.some(keyword => 
+    return quickKeywords.some(keyword =>
       task.title.toLowerCase().includes(keyword) ||
-      task.description?.toLowerCase().includes(keyword)
+      (task.description && task.description.toLowerCase().includes(keyword))
     );
   }
 
+  /**
+   * Checks if a task will have a high visible impact.
+   * @param task The task to check.
+   * @returns True if the task has high visible impact, otherwise false.
+   */
   private hasVisibleImpact(task: any): boolean {
     const impactKeywords = ['clear', 'surface', 'floor', 'counter', 'table', 'visible'];
-    return impactKeywords.some(keyword => 
+    return impactKeywords.some(keyword =>
       task.title.toLowerCase().includes(keyword)
     );
   }
 
+  /**
+   * Checks if a task is related to safety or hygiene.
+   * @param task The task to check.
+   * @returns True if the task is safety-related, otherwise false.
+   */
   private isSafetyRelated(task: any): boolean {
     const safetyKeywords = ['spill', 'wet', 'broken', 'hazard', 'block', 'path'];
-    return safetyKeywords.some(keyword => 
+    return safetyKeywords.some(keyword =>
       task.title.toLowerCase().includes(keyword)
     );
   }
 
+  /**
+   * Checks if a task is a blocker for other tasks.
+   * @param task The task to check.
+   * @param allTasks The list of all tasks.
+   * @returns True if the task is a blocker, otherwise false.
+   */
   private isBlocker(task: any, allTasks: any[]): boolean {
-    // Simple heuristic: tasks mentioning "before" or "first"
-    return task.description?.toLowerCase().includes('before') ||
-           task.description?.toLowerCase().includes('first');
+    return (task.description && (task.description.toLowerCase().includes('before') ||
+           task.description.toLowerCase().includes('first')));
   }
 
+  /**
+   * Checks if a task matches the user's current energy level (heuristic).
+   * @param task The task to check.
+   * @returns True if the task is a good match for the energy level.
+   */
   private matchesEnergyLevel(task: any): boolean {
-    // This would ideally check user's current energy level
-    // For now, prefer lighter tasks
     return this.isQuickWin(task);
   }
 
+  /**
+   * Generates the top recommendation based on priority scores.
+   * @param scores A map of task IDs to their scores.
+   * @param context The current agent context.
+   * @returns An object with the recommendation message, suggestions, and task ID.
+   */
   private getTopRecommendation(scores: Map<string, number>, context: AgentContext): {
     message: string;
     suggestions: string[];
@@ -144,7 +187,7 @@ export class PrioritizationAgent extends BaseAgent {
       message: `I suggest starting with "${topTaskTitle}" - it's a great choice!`,
       suggestions: [
         '✨ This task will give you a quick win',
-        '🚀 It'll build momentum for the next tasks',
+        '🚀 It\'ll build momentum for the next tasks',
         '💡 Trust your gut if you prefer a different task'
       ],
       taskId: sortedTasks[0][0]

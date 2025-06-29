@@ -1,6 +1,14 @@
 import { BaseAgent, AgentContext, AgentResponse, AgentCategory, AgentConfig } from '../AgentTypes';
 
+/**
+ * The FocusAgent helps users maintain attention and avoid overwhelm.
+ * It detects signs of distraction, such as task switching or a large number of tasks,
+ * and provides gentle reminders and actionable focus techniques.
+ */
 export class FocusAgent extends BaseAgent {
+  /**
+   * Creates an instance of FocusAgent.
+   */
   constructor() {
     const config: AgentConfig = {
       id: 'focus',
@@ -28,6 +36,12 @@ export class FocusAgent extends BaseAgent {
     super(config);
   }
 
+  /**
+   * Determines if the agent can provide help based on the current context.
+   * It checks for a high number of tasks, long sessions, or frequent task switching.
+   * @param context The current agent context.
+   * @returns True if the agent can help, otherwise false.
+   */
   canHelp(context: AgentContext): boolean {
     if (!context.currentTask) return false;
     
@@ -38,11 +52,16 @@ export class FocusAgent extends BaseAgent {
     return hasMultipleTasks || longSession || switchedTasks;
   }
 
+  /**
+   * Analyzes the context and generates a response with focus tips and actions.
+   * @param context The current agent context.
+   * @returns An AgentResponse with suggestions, or null if it can't help.
+   */
   async analyze(context: AgentContext): Promise<AgentResponse | null> {
     if (!this.canHelp(context)) return null;
 
     const focusTips = this.generateFocusTips(context);
-    const currentTaskReminder = context.currentTask ? 
+    const currentTaskReminder = context.currentTask ?
       `Your current task: "${context.currentTask.title}"` : '';
 
     return this.createResponse(
@@ -61,6 +80,11 @@ export class FocusAgent extends BaseAgent {
     );
   }
 
+  /**
+   * Generates a list of context-aware focus tips.
+   * @param context The current agent context.
+   * @returns An array of strings with focus tips.
+   */
   private generateFocusTips(context: AgentContext): string[] {
     const tips: string[] = [];
     
@@ -82,17 +106,27 @@ export class FocusAgent extends BaseAgent {
     return tips;
   }
 
+  /**
+   * Detects if the user has been switching between tasks frequently.
+   * @param context The current agent context.
+   * @returns True if frequent task switching is detected, otherwise false.
+   */
   private detectTaskSwitching(context: AgentContext): boolean {
     if (!context.sessionHistory || context.sessionHistory.length < 3) return false;
     
     const recentActions = context.sessionHistory.slice(-5);
-    const taskChanges = recentActions.filter(action => 
+    const taskChanges = recentActions.filter(action =>
       action.type === 'task_viewed' || action.type === 'task_selected'
     );
     
     return taskChanges.length >= 3;
   }
 
+  /**
+   * Selects an appropriate focus technique based on the context.
+   * @param context The current agent context.
+   * @returns The name of a focus technique as a string.
+   */
   private selectFocusTechnique(context: AgentContext): string {
     const techniques = [
       'pomodoro',

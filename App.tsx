@@ -8,8 +8,12 @@ import { SettingsPanel } from './components/SettingsPanel';
 import { MessageCard } from './components/MessageCard';
 import { LandingPage } from './components/LandingPage';
 import Footer from './components/Footer';
+import LogMomentPage from './components/sensory_tracker/LogMomentPage';
+import TimelinePage from './components/sensory_tracker/TimelinePage';
+import DashboardPage from './components/sensory_tracker/DashboardPage';
+import BottomNav from './components/shared/BottomNav';
 import { AppScreen } from './types';
-import type { Task, ImageAnalysisObservation } from './types';
+import type { Task, ImageAnalysisObservation, SensoryMoment } from './types';
 import { analyzeImageWithGemini, generateCleaningPlanWithGemini, generateCelebratoryMessageForTask } from './services/geminiService';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -24,14 +28,42 @@ const App: React.FC = () => {
   const [currentTaskIndex, setCurrentTaskIndex] = useState<number>(0);
   const [draggingItemId, setDraggingItemId] = useState<string | null>(null);
 
+  const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const [enableVoice, setEnableVoice] = useState<boolean>(false);
   const [enableGamification, setEnableGamification] = useState<boolean>(true);
   const [streak, setStreak] = useState<number>(0);
 
-  const [lastCommandFeedback, ] = useState<string>('');
+  const [lastCommandFeedback] = useState<string>('');
+  
+  // Sensory Tracker state
+  const [sensoryMoments, setSensoryMoments] = useState<SensoryMoment[]>([]);
 
   const handleLaunchCleaningTool = useCallback(() => {
     setCurrentScreen(AppScreen.ImageUpload);
+  }, []);
+
+  // Sensory Tracker handlers
+  const handleSaveMoment = useCallback((momentData: Omit<SensoryMoment, 'id' | 'timestamp'>) => {
+    const newMoment: SensoryMoment = {
+      id: uuidv4(),
+      timestamp: Date.now(),
+      behaviors: momentData.behaviors,
+      environment: momentData.environment,
+      overallState: momentData.overallState,
+      contextNote: momentData.contextNote,
+    };
+    
+    setSensoryMoments(prev => [newMoment, ...prev]);
+    setCurrentScreen(AppScreen.Timeline);
+  }, []);
+
+  const handleCancelLogMoment = useCallback(() => {
+    setCurrentScreen(AppScreen.Dashboard);
+  }, []);
+
+  const handleLaunchSensoryTracker = useCallback(() => {
+    console.log("Launching Sensory Tracker");
+    setCurrentScreen(AppScreen.LogMoment);
   }, []);
 
   const speak = useCallback((text: string) => {
@@ -251,7 +283,7 @@ const App: React.FC = () => {
 
     switch (currentScreen) {
       case AppScreen.Home:
-        return <LandingPage onLaunchCleaningTool={handleLaunchCleaningTool} />;
+        return <LandingPage onLaunchCleaningTool={handleLaunchCleaningTool} onLaunchSensoryTracker={handleLaunchSensoryTracker} />;
       case AppScreen.ImageUpload:
         return <ImageUploader onImageUpload={handleImageUpload} />;
       case AppScreen.Tasks:
@@ -305,6 +337,13 @@ const App: React.FC = () => {
                 </button>
             </div>
         );
+      // Sensory Tracker screens
+      case AppScreen.LogMoment:
+        return <LogMomentPage onSaveMoment={handleSaveMoment} onCancel={handleCancelLogMoment} />;
+      case AppScreen.Timeline:
+        return <TimelinePage moments={sensoryMoments} />;
+      case AppScreen.Dashboard:
+        return <DashboardPage moments={sensoryMoments} />;
       default: 
         if (!apiKey) {
             return <LoadingSpinner message="Initializing..." />;
@@ -315,10 +354,14 @@ const App: React.FC = () => {
 
   return (
     <div className="relative flex size-full min-h-screen flex-col justify-between group/design-root overflow-x-hidden bg-[var(--background-primary)] dark">
-      <Header streak={enableGamification ? streak : undefined} />
+      <Header 
+        streak={enableGamification ? streak : undefined}
+        title={currentScreen === AppScreen.Home ? "ONE APP" : "ADHD Cleaning Companion"}
+        onToggleSettings={() => setIsSettingsOpen(prev => !prev)}
+      />
       
       <main className="flex-grow">
-        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <div className="mx-auto px-4 py-8 sm:px-6 lg:px-8">
           {renderContent()}
         </div>
       </main>
@@ -333,7 +376,13 @@ const App: React.FC = () => {
         </div>
       )}
 
+      {/* Show BottomNav only for sensory tracker screens */}
+      {[AppScreen.LogMoment, AppScreen.Timeline, AppScreen.Dashboard].includes(currentScreen) && (
+        <BottomNav currentScreen={currentScreen} onNavigate={setCurrentScreen} />
+      )}
+
       <SettingsPanel
+        isOpen={isSettingsOpen}
         enableVoice={enableVoice}
         onToggleVoice={() => {
             setEnableVoice(prev => {

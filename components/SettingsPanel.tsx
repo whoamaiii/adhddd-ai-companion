@@ -1,6 +1,7 @@
 import React from 'react';
 
 interface SettingsPanelProps {
+  isOpen: boolean;
   enableVoice: boolean;
   onToggleVoice: () => void;
   enableGamification: boolean;
@@ -8,13 +9,14 @@ interface SettingsPanelProps {
 }
 
 export const SettingsPanel: React.FC<SettingsPanelProps> = ({
+  isOpen,
   enableVoice,
   onToggleVoice,
   enableGamification,
   onToggleGamification,
 }) => {
   return (
-    <div className="fixed bottom-4 right-4 bg-[var(--bg-card)] rounded-xl shadow-2xl border border-[var(--border-light)] z-50 w-72 md:w-80 max-h-[80vh] flex flex-col">
+    <div className={`fixed bottom-16 right-4 bg-[var(--bg-card)] rounded-xl shadow-2xl border border-[var(--border-light)] z-50 w-72 md:w-80 max-h-[80vh] flex-col ${isOpen ? 'flex' : 'hidden'}`}>
       <div className="p-3 md:p-4 border-b border-[var(--border-light)]">
         <h3 className="text-base md:text-lg font-semibold text-[var(--text-primary)]">Settings</h3>
       </div>

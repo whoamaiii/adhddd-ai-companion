@@ -52,9 +52,9 @@ export class MotivationAgent extends BaseAgent {
                            context.userMood === 'tired' ||
                            context.completedTasksCount === 0;
     
-    const shouldCelebrate = context.completedTasksCount && 
+    const shouldCelebrate = !!(context.completedTasksCount &&
                            context.completedTasksCount > 0 &&
-                           context.completedTasksCount % 3 === 0;
+                           context.completedTasksCount % 3 === 0);
     
     return needsMotivation || shouldCelebrate;
   }

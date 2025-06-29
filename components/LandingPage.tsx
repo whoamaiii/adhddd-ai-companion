@@ -2,13 +2,14 @@ import React from 'react';
 
 interface LandingPageProps {
   onLaunchCleaningTool: () => void;
+  onLaunchSensoryTracker: () => void;
 }
 
-export const LandingPage: React.FC<LandingPageProps> = ({ onLaunchCleaningTool }) => {
+export const LandingPage: React.FC<LandingPageProps> = ({ onLaunchCleaningTool, onLaunchSensoryTracker }) => {
   return (
     <>
       <h2 className="text-[var(--text-primary)] text-3xl font-bold leading-tight tracking-tight text-center mb-10 sm:text-4xl">Tools to help your brain.</h2>
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 @container">
+      <div className="grid grid-cols-1 gap-6 @container">
         <div className="glassmorphism-card rounded-2xl p-6 shadow-xl flex flex-col items-center text-center transition-all duration-300 hover:shadow-2xl hover:scale-[1.02]">
           <div className="mb-4 text-[var(--primary-color)]">
             <svg className="opacity-80" fill="currentColor" height="64" viewBox="0 0 256 256" width="64" xmlns="http://www.w3.org/2000/svg">
@@ -24,14 +25,20 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLaunchCleaningTool }
             Launch
           </button>
         </div>
-        <div className="glassmorphism-card rounded-2xl p-6 shadow-xl flex flex-col items-center text-center opacity-50 border-dashed border-2 border-[var(--glass-border)]">
-          <div className="mb-4 text-[var(--text-secondary)]">
-            <svg fill="currentColor" height="64" viewBox="0 0 256 256" width="64" xmlns="http://www.w3.org/2000/svg">
-              <path d="M224,128a8,8,0,0,1-8,8H136v80a8,8,0,0,1-16,0V136H40a8,8,0,0,1,0-16h80V40a8,8,0,0,1,16,0v80h80A8,8,0,0,1,224,128Z"></path>
+        <div className="glassmorphism-card rounded-2xl p-6 shadow-xl flex flex-col items-center text-center transition-all duration-300 hover:shadow-2xl hover:scale-[1.02]">
+          <div className="mb-4 text-[var(--primary-color)]">
+            <svg className="opacity-80" fill="currentColor" height="64" viewBox="0 0 256 256" width="64" xmlns="http://www.w3.org/2000/svg">
+              <path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216ZM172.49,99.51a12,12,0,0,1,0,17l-32,32a12,12,0,0,1-17,0l-16-16a12,12,0,0,1,17-17L132,123l23.51-23.52A12,12,0,0,1,172.49,99.51Z"></path>
             </svg>
           </div>
-          <h3 className="text-xl font-semibold text-[var(--text-secondary)] mb-2">New Tool Coming Soon</h3>
-          <p className="text-sm text-[var(--text-secondary)] mb-6">Stay tuned for more helpful micro-tools!</p>
+          <h3 className="text-xl font-semibold text-[var(--text-primary)] mb-2">Sensory & Feeling Tracker</h3>
+          <p className="text-sm text-[var(--text-secondary)] mb-6">Track sensory experiences and emotional states for better understanding.</p>
+          <button 
+            className="glassmorphism-button w-full max-w-xs rounded-xl h-12 px-6 text-white text-base font-semibold leading-normal shadow-md focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)] focus:ring-opacity-50"
+            onClick={onLaunchSensoryTracker}
+          >
+            Launch
+          </button>
         </div>
       </div>
     </>
