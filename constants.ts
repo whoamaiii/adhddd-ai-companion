@@ -76,3 +76,22 @@ Examples:
 Respond with only the celebratory message, no extra text or formatting.
 Celebratory message:
 `;
+
+export const SENSORY_INSIGHT_PROMPT_TEMPLATE = (momentsData: string): string => `
+You are an empathetic data analyst specializing in sensory experiences and emotional states.
+Analyze the following logged sensory data:
+${momentsData}
+
+Your goal is to identify patterns, correlations, and potential triggers that might be influencing the user's overall state.
+Look for connections between:
+- Specific behaviors and their impact on overall state.
+- Environmental triggers and their correlation with certain states or behaviors.
+- Time of day or day of week patterns.
+
+Generate a short (1-3 sentences), supportive, and insightful summary of your findings.
+The summary should be encouraging and actionable, helping the user understand their patterns better.
+
+Example Insight: "I notice that 'Loud Noises' and 'Crowded' environments often appear on days you feel most overwhelmed. Perhaps try to find quieter spaces during those times if possible."
+
+Provide only the insight summary as plain text.
+`;

@@ -21,8 +21,8 @@ const BottomNav: React.FC<BottomNavProps> = ({ currentScreen, onNavigate }) => {
         }`}
         onClick={() => onNavigate(AppScreen.LogMoment)}
       >
-        <span className={`material-icons-outlined ${isActive(AppScreen.LogMoment) ? '!text-[var(--one-app-primary-darker,theme(colors.sky.700))]' : ''}`}>home</span>
-        <p className={`text-xs ${isActive(AppScreen.LogMoment) ? 'font-bold' : 'font-medium'} leading-normal`}>Home</p>
+        <span className={`material-icons-outlined ${isActive(AppScreen.LogMoment) ? '!text-[var(--one-app-primary-darker,theme(colors.sky.700))]' : ''}`}>add_chart</span>
+        <p className={`text-xs ${isActive(AppScreen.LogMoment) ? 'font-bold' : 'font-medium'} leading-normal`}>Log Moment</p>
       </button>
       <button
         className={`flex flex-1 flex-col items-center justify-end gap-0.5 py-1 ${

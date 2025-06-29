@@ -1,7 +1,7 @@
 
 import { GoogleGenAI, GenerateContentResponse, Part } from "@google/genai";
-import { GEMINI_TEXT_MODEL, INITIAL_ANALYSIS_PROMPT, TASK_GENERATION_PROMPT_TEMPLATE, TASK_COMPLETION_CELEBRATION_PROMPT_TEMPLATE } from '../constants';
-import type { ImageAnalysisObservation, GeminiTaskResponseItem, Task } from '../types';
+import { GEMINI_TEXT_MODEL, INITIAL_ANALYSIS_PROMPT, TASK_GENERATION_PROMPT_TEMPLATE, TASK_COMPLETION_CELEBRATION_PROMPT_TEMPLATE, SENSORY_INSIGHT_PROMPT_TEMPLATE } from '../constants';
+import type { ImageAnalysisObservation, GeminiTaskResponseItem, Task, SensoryMoment } from '../types';
 
 /**
  * Converts a base64 encoded image string to a GenerativePart object for the Gemini API.
@@ -173,6 +173,52 @@ export const generateCleaningPlanWithGemini = async (
   } catch (error) {
     console.error("Error generating cleaning plan with Gemini:", error);
     throw new Error(`AI task plan generation failed: ${error instanceof Error ? error.message : String(error)}`);
+  }
+};
+
+/**
+ * Generates personalized sensory insights based on logged data.
+ * @param ai The initialized GoogleGenAI client.
+ * @param moments An array of SensoryMoment objects.
+ * @returns A promise that resolves to a string containing the AI-generated insight.
+ */
+export const generateSensoryInsights = async (
+  ai: GoogleGenAI,
+  moments: SensoryMoment[]
+): Promise<string> => {
+  if (moments.length === 0) {
+    return "No data available to generate insights.";
+  }
+
+  // Format the moments data into a string for the prompt.
+  // We'll select key fields to keep the input concise.
+  const formattedMomentsData = JSON.stringify(
+    moments.map(moment => ({
+      timestamp: moment.timestamp,
+      overallState: moment.overallState,
+      behaviors: moment.behaviors,
+      environment: moment.environment,
+    }))
+  );
+
+  const prompt = SENSORY_INSIGHT_PROMPT_TEMPLATE(formattedMomentsData);
+
+  try {
+    const response: GenerateContentResponse = await ai.models.generateContent({
+      model: GEMINI_TEXT_MODEL,
+      contents: [{ parts: [{ text: prompt }] }],
+    });
+
+    const insightText = response.text?.trim() ?? '';
+
+    if (!insightText) {
+      return "Could not generate insights at this time. Please try again later.";
+    }
+    return insightText;
+
+  } catch (error) {
+    console.error("Error generating sensory insights with Gemini:", error);
+    return `An error occurred while generating insights: ${error instanceof Error ? error.message : String(error)}`;
   }
 };
 

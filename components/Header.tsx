@@ -1,17 +1,31 @@
 import React from 'react';
+import { AppScreen } from '../types';
 
 interface HeaderProps {
   streak?: number;
   title?: string;
   onToggleSettings: () => void;
+  currentScreen: AppScreen;
+  onNavigate: (screen: AppScreen) => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ streak = 0, title = "ONE APP", onToggleSettings }) => {
+export const Header: React.FC<HeaderProps> = ({ streak = 0, title = "ONE APP", onToggleSettings, currentScreen, onNavigate }) => {
+  const isSensoryTrackerScreen = [AppScreen.LogMoment, AppScreen.Timeline, AppScreen.Dashboard].includes(currentScreen);
+
   return (
     <header className="sticky top-0 z-50 bg-[var(--background-primary)]/80 backdrop-blur-md">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between">
           <div className="flex items-center">
+            {isSensoryTrackerScreen && (
+              <button 
+                onClick={() => onNavigate(AppScreen.Home)}
+                className="mr-2 flex items-center justify-center rounded-full p-2 text-[var(--text-primary)] hover:bg-[var(--glass-background)] transition-colors duration-200"
+                aria-label="Go Home"
+              >
+                <span className="material-icons-outlined">arrow_back</span>
+              </button>
+            )}
             <h1 className="text-[var(--text-primary)] text-2xl font-bold tracking-tight">{title}</h1>
           </div>
           <div className="flex items-center">

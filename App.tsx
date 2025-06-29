@@ -8,9 +8,9 @@ import { SettingsPanel } from './components/SettingsPanel';
 import { MessageCard } from './components/MessageCard';
 import { LandingPage } from './components/LandingPage';
 import Footer from './components/Footer';
-import LogMomentPage from './components/sensory_tracker/LogMomentPage';
-import TimelinePage from './components/sensory_tracker/TimelinePage';
-import DashboardPage from './components/sensory_tracker/DashboardPage';
+import LogMomentPage from './components/sensory_tracker/LogMomentPage.tsx';
+import TimelinePage from './components/sensory_tracker/TimelinePage.tsx';
+import DashboardPage from './components/sensory_tracker/DashboardPage.tsx';
 import BottomNav from './components/shared/BottomNav';
 import { AppScreen } from './types';
 import type { Task, ImageAnalysisObservation, SensoryMoment } from './types';
@@ -22,7 +22,23 @@ const App: React.FC = () => {
   const [currentScreen, setCurrentScreen] = useState<AppScreen>(AppScreen.Home);
   const [, setUploadedImages] = useState<string[] | null>(null);
   const [, setImageAnalysis] = useState<ImageAnalysisObservation[]>([]);
-  const [tasks, setTasks] = useState<Task[]>([]);
+  const [tasks, setTasks] = useState<Task[]>(() => {
+    try {
+      const savedTasks = localStorage.getItem('adhddd_tasks');
+      if (savedTasks) {
+        const parsed = JSON.parse(savedTasks);
+        // Basic validation
+        if (Array.isArray(parsed)) {
+          console.log(`[Data Persistence] Loaded ${parsed.length} tasks from localStorage`);
+          return parsed;
+        }
+      }
+      console.log('[Data Persistence] No existing tasks found in localStorage');
+    } catch (e) {
+      console.error('[Data Persistence] Failed to load tasks from localStorage:', e);
+    }
+    return [];
+  });
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [currentTaskIndex, setCurrentTaskIndex] = useState<number>(0);
@@ -36,7 +52,42 @@ const App: React.FC = () => {
   const [lastCommandFeedback] = useState<string>('');
   
   // Sensory Tracker state
-  const [sensoryMoments, setSensoryMoments] = useState<SensoryMoment[]>([]);
+  const [sensoryMoments, setSensoryMoments] = useState<SensoryMoment[]>(() => {
+    try {
+      const savedMoments = localStorage.getItem('adhddd_sensoryMoments');
+      if (savedMoments) {
+        const parsed = JSON.parse(savedMoments);
+        // Basic validation
+        if (Array.isArray(parsed)) {
+          console.log(`[Data Persistence] Loaded ${parsed.length} sensory moments from localStorage`);
+          return parsed;
+        }
+      }
+      console.log('[Data Persistence] No existing sensory moments found in localStorage');
+    } catch (e) {
+      console.error('[Data Persistence] Failed to load sensory moments from localStorage:', e);
+    }
+    return [];
+  });
+
+  // Persistence effects
+  useEffect(() => {
+    try {
+      localStorage.setItem('adhddd_tasks', JSON.stringify(tasks));
+      console.log(`[Data Persistence] Saved ${tasks.length} tasks to localStorage`);
+    } catch (e) {
+      console.error('[Data Persistence] Failed to save tasks to localStorage:', e);
+    }
+  }, [tasks]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('adhddd_sensoryMoments', JSON.stringify(sensoryMoments));
+      console.log(`[Data Persistence] Saved ${sensoryMoments.length} sensory moments to localStorage`);
+    } catch (e) {
+      console.error('[Data Persistence] Failed to save sensory moments to localStorage:', e);
+    }
+  }, [sensoryMoments]);
 
   const handleLaunchCleaningTool = useCallback(() => {
     setCurrentScreen(AppScreen.ImageUpload);
@@ -268,7 +319,10 @@ const App: React.FC = () => {
       return <LoadingSpinner message={currentScreen === AppScreen.Processing ? "AI is analyzing and planning..." : "Loading..."} />;
     }
     if (currentScreen === AppScreen.Error && error) {
-      return <MessageCard type="error" title="An Error Occurred" message={error} onDismiss={() => {setError(null); apiKey ? setCurrentScreen(AppScreen.ImageUpload) : setCurrentScreen(AppScreen.Welcome);}} />;
+      return <MessageCard type="error" title="An Error Occurred" message={error} onDismiss={() => {
+        setError(null);
+        setCurrentScreen(apiKey ? AppScreen.ImageUpload : AppScreen.Welcome);
+      }} />;
     }
     
     if (currentScreen === AppScreen.Welcome) {
@@ -358,6 +412,8 @@ const App: React.FC = () => {
         streak={enableGamification ? streak : undefined}
         title={currentScreen === AppScreen.Home ? "ONE APP" : "ADHD Cleaning Companion"}
         onToggleSettings={() => setIsSettingsOpen(prev => !prev)}
+        currentScreen={currentScreen}
+        onNavigate={setCurrentScreen}
       />
       
       <main className="flex-grow">
