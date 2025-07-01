@@ -25,6 +25,13 @@ export const TaskItem: React.FC<TaskItemProps> = ({
   const [isDragOver, setIsDragOver] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
 
+  // Constants for task difficulty to avoid magic strings in styling
+  const TASK_DIFFICULTY = {
+    EASY: 'easy',
+    MEDIUM: 'medium',
+    HARD: 'hard',
+  };
+
   let mainTaskText = task.text;
   let locationText: string | null = null;
   const parts = task.text.split('@');
@@ -37,19 +44,25 @@ export const TaskItem: React.FC<TaskItemProps> = ({
 
   const itemClasses = `
     p-3 md:p-4 rounded-xl shadow-sm border transition-all duration-300 ease-in-out flex items-start gap-3 md:gap-4 
+    ${/* Base styling based on completion or deferred status */''}
     ${task.isCompleted 
-      ? 'bg-[var(--success-bg-light)] border-[var(--success-color)] opacity-80' 
+      ? 'bg-[var(--success-bg-light)] border-[var(--success-color)] opacity-80' // Completed task style
       : task.isDeferred
-      ? 'bg-gray-50 border-gray-300 opacity-60'
-      : 'bg-[var(--bg-card)] border-[var(--border-light)] hover:shadow-md'
+      ? 'bg-gray-50 border-gray-300 opacity-60' // Deferred task style
+      : 'bg-[var(--bg-card)] border-[var(--border-light)] hover:shadow-md' // Default active task style
     }
+    ${/* Styling for the current, non-completed, non-deferred task */''}
     ${isCurrent && !task.isCompleted && !task.isDeferred
       ? 'ring-2 ring-[var(--primary-color)] scale-102 shadow-lg border-transparent' 
       : ''
     }
+    ${/* Cursor style based on draggable state */''}
     ${!task.isCompleted && !task.isDeferred ? 'cursor-grab' : 'cursor-default'}
+    ${/* Styling when the item is being dragged */''}
     ${isBeingDragged ? 'opacity-50 border-dashed border-[var(--primary-color)]' : ''}
+    ${/* Styling when a draggable item is over this item (as a drop target) */''}
     ${isDragOver && !isBeingDragged && !task.isCompleted && !task.isDeferred ? 'border-t-2 border-t-[var(--primary-color)] border-b-transparent border-x-transparent shadow-none scale-100' : ''}
+    ${/* Additional class for deferred tasks if specific global styles target it */''}
     ${task.isDeferred ? 'task-deferred' : ''}
   `;
   
@@ -175,9 +188,9 @@ export const TaskItem: React.FC<TaskItemProps> = ({
                 {task.difficulty && (
                     <span 
                         className={`px-2 py-0.5 rounded-full font-medium text-white text-xs
-                            ${task.difficulty === 'easy' ? 'bg-green-500' : ''}
-                            ${task.difficulty === 'medium' ? 'bg-yellow-500' : ''}
-                            ${task.difficulty === 'hard' ? 'bg-orange-500' : ''}
+                            ${task.difficulty === TASK_DIFFICULTY.EASY ? 'bg-green-500' : ''}
+                            ${task.difficulty === TASK_DIFFICULTY.MEDIUM ? 'bg-yellow-500' : ''}
+                            ${task.difficulty === TASK_DIFFICULTY.HARD ? 'bg-orange-500' : ''}
                         `}
                     >
                         {task.difficulty.charAt(0).toUpperCase() + task.difficulty.slice(1)}
