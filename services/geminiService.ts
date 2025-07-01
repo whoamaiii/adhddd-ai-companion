@@ -25,6 +25,7 @@ function base64ToGenerativePart(base64: string, mimeType: string): Part {
  * @param fallbackValue A default value to return if parsing fails.
  * @param context A string to identify the type of data being parsed ('observations' or 'tasks') for more specific validation.
  * @returns The parsed JSON object, or the fallback value.
+ * @remarks The string-splitting fallback for list-like text responses is a basic heuristic and might be fragile if the AI's non-JSON response format for lists changes significantly.
  */
 function parseJsonFromGeminiResponse<T,>(responseText: string, fallbackValue: T, context?: 'observations' | 'tasks'): T {
   let jsonStr = responseText.trim();
@@ -49,11 +50,19 @@ function parseJsonFromGeminiResponse<T,>(responseText: string, fallbackValue: T,
     return parsed as T;
   } catch (e) {
     console.error("Failed to parse JSON response:", e, "Raw response:", responseText);
-    // Fallback for simple list-like text responses
-    if (Array.isArray(fallbackValue) && fallbackValue.length === 0 && typeof responseText === 'string') {
+    // Fallback for simple list-like text responses OR if AI returns an error as plain text
+    if (Array.isArray(fallbackValue) && fallbackValue.length === 0 && typeof responseText === 'string' && responseText.trim().length > 0) {
+        // If context is observations and responseText includes "description", attempt to parse as simple list
         if (context === "observations" && responseText.includes("description")) {
              return responseText.split('\n').map(line => ({ description: line.trim() })).filter(obs => obs.description) as unknown as T;
         }
+        // If parsing failed and fallback is an empty array, but we have some text,
+        // return a "special" error object within the array for easier debugging upstream.
+        // This helps distinguish between "AI returned nothing" and "AI returned something unparsable".
+        // Ensure this structure is handled by the calling function if specific error objects are needed.
+        // For now, this example adds a generic error entry.
+        // @ts-ignore - Allowing a differently structured object in the array for error reporting
+        return [{ error: "Failed to parse AI response", details: `Raw output preview: ${responseText.substring(0, 200)}...` }] as T;
     }
     return fallbackValue;
   }

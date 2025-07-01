@@ -8,6 +8,12 @@ import { BaseAgent, AgentContext, AgentResponse, AgentCategory, AgentConfig } fr
 export class FocusAgent extends BaseAgent {
   /**
    * Creates an instance of FocusAgent.
+   * @remarks
+   * This agent's effectiveness in detecting task switching and providing some mood-based
+   * suggestions (e.g., for 'tired' userMood) is currently limited by the data provided
+   * in `AgentContext`. Specifically, `sessionHistory` is not yet populated with user
+   * actions, and `userMood` is a basic heuristic. Future enhancements to `AgentContext`
+   * in `App.tsx` could improve this agent's capabilities.
    */
   constructor() {
     const config: AgentConfig = {
@@ -128,22 +134,22 @@ export class FocusAgent extends BaseAgent {
    * @returns The name of a focus technique as a string.
    */
   private selectFocusTechnique(context: AgentContext): string {
-    const techniques = [
-      'pomodoro',
-      'time-boxing',
-      'single-tasking',
-      'mindful-breathing',
-      'body-scan'
-    ];
+    const FOCUS_TECHNIQUES = {
+      POMODORO: 'pomodoro',
+      TIME_BOXING: 'time-boxing',
+      SINGLE_TASKING: 'single-tasking',
+      MINDFUL_BREATHING: 'mindful-breathing',
+      BODY_SCAN: 'body-scan',
+    };
     
     if (context.timeOfDay === 'morning') {
-      return 'pomodoro';
+      return FOCUS_TECHNIQUES.POMODORO;
     } else if (context.userMood === 'tired') {
-      return 'mindful-breathing';
+      return FOCUS_TECHNIQUES.MINDFUL_BREATHING;
     } else if (context.allTasks && context.allTasks.length > 10) {
-      return 'time-boxing';
+      return FOCUS_TECHNIQUES.TIME_BOXING;
     }
     
-    return 'single-tasking';
+    return FOCUS_TECHNIQUES.SINGLE_TASKING;
   }
 }

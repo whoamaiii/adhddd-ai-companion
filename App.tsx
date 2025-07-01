@@ -30,10 +30,10 @@ const App: React.FC = () => {
     orchestrator.registerAgent(new MotivationAgent());
     return orchestrator;
   });
-  const [agentSuggestions, setAgentSuggestions] = useState<string[]>([]);
-  const [apiKey, setApiKey] = useState<string | null>(null);
-  const [currentScreen, setCurrentScreen] = useState<AppScreen>(AppScreen.Home);
-  const [, setUploadedImages] = useState<string[] | null>(null);
+  const [agentSuggestions, setAgentSuggestions] = useState<string[]>([]); // Suggestions provided by AI agents
+  const [apiKey, setApiKey] = useState<string | null>(null); // Stores the Gemini API key
+  const [currentScreen, setCurrentScreen] = useState<AppScreen>(AppScreen.Home); // Manages the current view of the application
+  const [, setUploadedImages] = useState<string[] | null>(null); // Stores base64 encoded strings of uploaded images
   const [, setImageAnalysis] = useState<ImageAnalysisObservation[]>([]);
   const [tasks, setTasks] = useState<Task[]>(() => {
     try {
@@ -54,30 +54,36 @@ const App: React.FC = () => {
   });
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const [currentTaskIndex, setCurrentTaskIndex] = useState<number>(0);
+  const [currentTaskIndex, setCurrentTaskIndex] = useState<number>(0); // Index of the currently focused task in the tasks array
   const [draggingItemId, setDraggingItemId] = useState<string | null>(null);
 
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
-  const [enableVoice, setEnableVoice] = useState<boolean>(false);
-  const [enableGamification, setEnableGamification] = useState<boolean>(true);
-  const [streak, setStreak] = useState<number>(0);
+  const [enableVoice, setEnableVoice] = useState<boolean>(false); // User preference for voice assistance
+  const [enableGamification, setEnableGamification] = useState<boolean>(true); // User preference for gamification features
+  const [streak, setStreak] = useState<number>(0); // Current task completion streak
 
-  const [lastCommandFeedback] = useState<string>('');
-  const [completedTasksCount, setCompletedTasksCount] = useState<number>(0);
+  // const [lastCommandFeedback] = useState<string>(''); // This state was confirmed unused and its declaration removed.
+  const [completedTasksCount, setCompletedTasksCount] = useState<number>(0); // Counter for tasks marked as complete in the current session/list
   
   // Sensory Tracker state
-  const [sensoryMoments, setSensoryMoments] = useState<SensoryMoment[]>(() => {
+  const [sensoryMoments, setSensoryMoments] = useState<SensoryMoment[]>(() => { // Stores logged sensory moments for the tracker feature
     try {
       const savedMoments = localStorage.getItem('adhddd_sensoryMoments');
       if (savedMoments) {
         const parsed = JSON.parse(savedMoments);
         // Basic validation
         if (Array.isArray(parsed)) {
-          console.log(`[Data Persistence] Loaded ${parsed.length} sensory moments from localStorage`);
+          // Conditional logging for development environment
+          if (import.meta.env.DEV) {
+            console.log(`[Data Persistence] Loaded ${parsed.length} sensory moments from localStorage`);
+          }
           return parsed;
         }
       }
-      console.log('[Data Persistence] No existing sensory moments found in localStorage');
+      // Conditional logging for development environment
+      if (import.meta.env.DEV) {
+        console.log('[Data Persistence] No existing sensory moments found in localStorage');
+      }
     } catch (e) {
       console.error('[Data Persistence] Failed to load sensory moments from localStorage:', e);
     }
@@ -85,10 +91,13 @@ const App: React.FC = () => {
   });
 
   // Persistence effects
+  // Effect to save tasks to localStorage whenever the tasks state changes.
   useEffect(() => {
     try {
       localStorage.setItem('adhddd_tasks', JSON.stringify(tasks));
-      console.log(`[Data Persistence] Saved ${tasks.length} tasks to localStorage`);
+      if (import.meta.env.DEV) {
+        console.log(`[Data Persistence] Saved ${tasks.length} tasks to localStorage`);
+      }
     } catch (e) {
       console.error('[Data Persistence] Failed to save tasks to localStorage:', e);
     }
@@ -97,7 +106,9 @@ const App: React.FC = () => {
   useEffect(() => {
     try {
       localStorage.setItem('adhddd_sensoryMoments', JSON.stringify(sensoryMoments));
-      console.log(`[Data Persistence] Saved ${sensoryMoments.length} sensory moments to localStorage`);
+      if (import.meta.env.DEV) {
+        console.log(`[Data Persistence] Saved ${sensoryMoments.length} sensory moments to localStorage`);
+      }
     } catch (e) {
       console.error('[Data Persistence] Failed to save sensory moments to localStorage:', e);
     }
@@ -160,11 +171,35 @@ const App: React.FC = () => {
     speak(`Added task: ${newTask.text.split('@')[0].trim()}`);
   }, [currentTaskIndex, speak]);
 
+/**
+ * Determines the index of the next incomplete task to focus on.
+ * It searches forward from the position of the just-completed task, wrapping around the list.
+ * @param tasksList The array of all tasks.
+ * @param completedTaskId The ID of the task that was just completed.
+ * @returns The index of the next incomplete task, or -1 if all tasks are completed.
+ */
+const determineNextTaskIndex = (tasksList: Task[], completedTaskId: string): number => {
+  const currentCompletedTaskIndex = tasksList.findIndex(task => task.id === completedTaskId);
+
+  // Should not happen if logic is correct, but as a safeguard:
+  if (currentCompletedTaskIndex === -1) return tasksList.findIndex(t => !t.isCompleted) ?? -1;
+
+  for (let i = 1; i <= tasksList.length; i++) {
+    const nextPotentialIndex = (currentCompletedTaskIndex + i) % tasksList.length;
+    if (!tasksList[nextPotentialIndex].isCompleted) {
+      return nextPotentialIndex;
+    }
+  }
+  return -1; // All tasks are completed
+};
+
+  // Handles the completion of a task.
+  // Updates task state, triggers AI celebration, and navigates to the next task or completion screen.
   const handleTaskComplete = useCallback(async (taskId: string) => {
     let completedTaskTextForAISpeech = "";
     const updatedTasks = tasks.map((task: Task) => {
       if (task.id === taskId) {
-        completedTaskTextForAISpeech = task.text;
+        completedTaskTextForAISpeech = task.text; // Capture text for AI message before marking complete
         return { ...task, isCompleted: true };
       }
       return task;
@@ -172,7 +207,8 @@ const App: React.FC = () => {
     setTasks(updatedTasks);
     setCompletedTasksCount(prev => prev + 1);
 
-    // AI Celebration message
+    // Generate and speak an AI-powered celebratory message for the completed task.
+    // Falls back to a generic message if AI generation fails or API key is missing.
     let celebrationMessage = `Great job completing: ${completedTaskTextForAISpeech.split('@')[0].trim()}`;
     if (apiKey && completedTaskTextForAISpeech) {
       try {
@@ -183,38 +219,31 @@ const App: React.FC = () => {
         }
       } catch (e) {
         console.error("Failed to get AI celebratory message:", e);
-        // Fallback to generic message is already set
+        // Fallback to the generic message (already initialized)
       }
     }
     speak(celebrationMessage);
     
+    // Check if all tasks are now completed.
     const allTasksNowCompleted = updatedTasks.every((task: Task) => task.isCompleted);
 
     if (allTasksNowCompleted) {
         speak("Fantastic! You've completed all tasks for this area!");
         if (enableGamification) {
-            setStreak((s: number) => s + 1);
+            setStreak((s: number) => s + 1); // Increment streak if gamification is enabled
         }
-        setCurrentScreen(AppScreen.AllTasksCompleted);
+        setCurrentScreen(AppScreen.AllTasksCompleted); // Navigate to the completion screen
     } else {
-      let nextIncompleteTaskIndex = -1;
-      let searchStartIndex = tasks.findIndex((task: Task) => task.id === taskId);
-      if (searchStartIndex === -1) searchStartIndex = 0;
-
-      for (let i = 0; i < updatedTasks.length; i++) {
-        const checkIndex = (searchStartIndex + 1 + i) % updatedTasks.length;
-        if (!updatedTasks[checkIndex].isCompleted) {
-            nextIncompleteTaskIndex = checkIndex;
-            break;
-        }
-      }
+      // If there are remaining tasks, determine the next one to focus on.
+      const nextIncompleteTaskIndex = determineNextTaskIndex(updatedTasks, taskId);
       
       if (nextIncompleteTaskIndex !== -1) {
         setTimeout(() => {
           setCurrentTaskIndex(nextIncompleteTaskIndex);
-          // Speak for next task is handled by useEffect
-        }, 500); 
+          // Voice announcement for the new current task is handled by a separate useEffect.
+        }, 500); // Small delay to allow completion feedback to be processed.
       } else { 
+        // This case should ideally be covered by allTasksNowCompleted, but as a fallback:
         speak("Looks like that was the last one! Amazing!");
          if (enableGamification) {
             setStreak((s: number) => s + 1);
@@ -222,10 +251,11 @@ const App: React.FC = () => {
         setCurrentScreen(AppScreen.AllTasksCompleted);
       }
     }
-  }, [tasks, speak, enableGamification, apiKey]);
+  }, [tasks, speak, enableGamification, apiKey]); // Dependencies for the useCallback
 
 
-
+  // Effect to initialize the Gemini API key from environment variables.
+  // Sets an error state if the API key is not found, as it's critical for app functionality.
   useEffect(() => {
     const keyFromEnv = import.meta.env.VITE_GEMINI_API_KEY;
     if (keyFromEnv) {
@@ -309,6 +339,14 @@ const App: React.FC = () => {
   }, [currentTaskIndex, tasks, currentScreen, speak, enableVoice]);
 
   // Agent recommendations effect
+  // This effect is responsible for fetching and displaying suggestions from AI agents
+  // when the user is on the Tasks screen and there are tasks loaded.
+  // Dependencies:
+  // - currentScreen: Only runs when on AppScreen.Tasks.
+  // - tasks: Re-evaluates if the tasks list changes.
+  // - currentTaskIndex: Re-evaluates if the focused task changes.
+  // - completedTasksCount: Re-evaluates if a task is completed.
+  // - agentOrchestrator: Stable, but included as it's used to fetch recommendations.
   useEffect(() => {
     const getAgentRecommendations = async () => {
       if (currentScreen !== AppScreen.Tasks || tasks.length === 0) {
@@ -324,8 +362,14 @@ const App: React.FC = () => {
         } : undefined,
         allTasks: tasks,
         completedTasksCount: completedTasksCount,
-        userMood: tasks.filter(t => !t.isCompleted).length > 5 ? 'overwhelmed' : 'neutral',
-        sessionHistory: [] // Could track user actions in the future
+        userMood: tasks.filter(t => !t.isCompleted).length > 5 ? 'overwhelmed' : 'neutral', // Basic mood detection
+        sessionHistory: [], // Placeholder: Could track user actions for more advanced agent insights in the future
+        timeOfDay: (() => { // Determine time of day for context-aware suggestions
+          const hour = new Date().getHours();
+          if (hour < 12) return 'morning';
+          if (hour < 18) return 'afternoon';
+          return 'evening';
+        })(),
       };
 
       try {
@@ -483,15 +527,7 @@ const App: React.FC = () => {
         </div>
       </main>
 
-      {/* Voice Command Feedback */}
-      {lastCommandFeedback && (
-        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 bg-[var(--primary-color)] text-white px-6 py-3 rounded-full shadow-lg animate-fade-in-out">
-          <div className="flex items-center gap-2">
-            <i className="fas fa-microphone-alt"></i>
-            <span>{lastCommandFeedback}</span>
-          </div>
-        </div>
-      )}
+      {/* Voice Command Feedback JSX removed as the 'lastCommandFeedback' state was removed. */}
 
       {/* Show BottomNav only for sensory tracker screens */}
       {[AppScreen.LogMoment, AppScreen.Timeline, AppScreen.Dashboard].includes(currentScreen) && (
