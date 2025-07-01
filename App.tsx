@@ -3,6 +3,7 @@ import { GoogleGenAI } from "@google/genai";
 import { Header } from './components/Header';
 import { ImageUploader } from './components/ImageUploader';
 import { TaskList } from './components/TaskList';
+import { CelebrationScreen } from './components/CelebrationScreen';
 import { LoadingSpinner } from './components/LoadingSpinner';
 import { SettingsPanel } from './components/SettingsPanel';
 import { MessageCard } from './components/MessageCard';
@@ -16,8 +17,20 @@ import { AppScreen } from './types';
 import type { Task, ImageAnalysisObservation, SensoryMoment } from './types';
 import { analyzeImageWithGemini, generateCleaningPlanWithGemini, generateCelebratoryMessageForTask } from './services/geminiService';
 import { v4 as uuidv4 } from 'uuid';
+import { AgentOrchestrator } from './services/agents/AgentOrchestrator';
+import { FocusAgent } from './services/agents/core/FocusAgent';
+import { MotivationAgent } from './services/agents/core/MotivationAgent';
+import type { AgentContext } from './services/agents/AgentTypes';
 
 const App: React.FC = () => {
+  // Initialize agent system
+  const [agentOrchestrator] = useState(() => {
+    const orchestrator = new AgentOrchestrator();
+    orchestrator.registerAgent(new FocusAgent());
+    orchestrator.registerAgent(new MotivationAgent());
+    return orchestrator;
+  });
+  const [agentSuggestions, setAgentSuggestions] = useState<string[]>([]);
   const [apiKey, setApiKey] = useState<string | null>(null);
   const [currentScreen, setCurrentScreen] = useState<AppScreen>(AppScreen.Home);
   const [, setUploadedImages] = useState<string[] | null>(null);
@@ -50,6 +63,7 @@ const App: React.FC = () => {
   const [streak, setStreak] = useState<number>(0);
 
   const [lastCommandFeedback] = useState<string>('');
+  const [completedTasksCount, setCompletedTasksCount] = useState<number>(0);
   
   // Sensory Tracker state
   const [sensoryMoments, setSensoryMoments] = useState<SensoryMoment[]>(() => {
@@ -156,6 +170,7 @@ const App: React.FC = () => {
       return task;
     });
     setTasks(updatedTasks);
+    setCompletedTasksCount(prev => prev + 1);
 
     // AI Celebration message
     let celebrationMessage = `Great job completing: ${completedTaskTextForAISpeech.split('@')[0].trim()}`;
@@ -258,6 +273,12 @@ const App: React.FC = () => {
         estimatedTime: taskDetails.estimatedTime,
         difficulty: taskDetails.difficulty,
         prioritizationHint: taskDetails.prioritizationHint,
+        // Include spatial enhancement fields if available
+        ...(taskDetails.spatialContext && { spatialContext: taskDetails.spatialContext }),
+        ...(taskDetails.suggestedTools && { suggestedTools: taskDetails.suggestedTools }),
+        ...(taskDetails.relatedObjects && { relatedObjects: taskDetails.relatedObjects }),
+        ...(taskDetails.locationDescription && { locationDescription: taskDetails.locationDescription }),
+        ...(taskDetails.visualCues && { visualCues: taskDetails.visualCues }),
       }));
       setTasks(tasksWithIds);
       setCurrentTaskIndex(0);
@@ -286,6 +307,49 @@ const App: React.FC = () => {
       speak(`Current task: ${tasks[currentTaskIndex].text.split('@')[0].trim()}`);
     }
   }, [currentTaskIndex, tasks, currentScreen, speak, enableVoice]);
+
+  // Agent recommendations effect
+  useEffect(() => {
+    const getAgentRecommendations = async () => {
+      if (currentScreen !== AppScreen.Tasks || tasks.length === 0) {
+        setAgentSuggestions([]);
+        return;
+      }
+
+      const currentTask = tasks[currentTaskIndex];
+      const context: AgentContext = {
+        currentTask: currentTask ? {
+          title: currentTask.text,
+          isCompleted: currentTask.isCompleted
+        } : undefined,
+        allTasks: tasks,
+        completedTasksCount: completedTasksCount,
+        userMood: tasks.filter(t => !t.isCompleted).length > 5 ? 'overwhelmed' : 'neutral',
+        sessionHistory: [] // Could track user actions in the future
+      };
+
+      try {
+        const recommendations = await agentOrchestrator.getRecommendations(context);
+        const suggestions: string[] = [];
+        
+        recommendations.forEach(rec => {
+          if (rec.message) {
+            suggestions.push(rec.message);
+          }
+          if (rec.suggestions) {
+            suggestions.push(...rec.suggestions);
+          }
+        });
+
+        setAgentSuggestions(suggestions.slice(0, 3)); // Show top 3 suggestions
+      } catch (error) {
+        console.error('Failed to get agent recommendations:', error);
+        setAgentSuggestions([]);
+      }
+    };
+
+    getAgentRecommendations();
+  }, [currentScreen, tasks, currentTaskIndex, completedTasksCount, agentOrchestrator]);
 
   const handleTaskReorder = (draggedTaskId: string, targetTaskId: string) => {
     const currentFocusedTaskId = tasks[currentTaskIndex]?.id;
@@ -357,6 +421,7 @@ const App: React.FC = () => {
               onTaskDragStart={setDraggingItemId}
               onTaskDragEnd={() => setDraggingItemId(null)}
               onAddTask={handleAddTask}
+              agentSuggestions={agentSuggestions}
             />
           );
         }
@@ -378,18 +443,14 @@ const App: React.FC = () => {
         );
       case AppScreen.AllTasksCompleted:
         return (
-            <div className="text-center p-8 bg-white shadow-xl rounded-lg">
-                <i className="fas fa-party-popper text-5xl text-[var(--warning-color)] mb-4 animate-bounce"></i>
-                <h2 className="text-3xl font-bold text-[var(--success-color)] mb-3">All Done!</h2>
-                <p className="text-lg text-[var(--text-primary)] mb-6">You've successfully cleared this area. Amazing work!</p>
-                {enableGamification && <p className="text-xl text-[var(--primary-color)] font-semibold mb-6">Your cleaning streak: {streak} {streak > 0 ? '🎉' : ''}</p>}
-                <button
-                    onClick={handleReset}
-                    className="bg-[var(--primary-color)] hover:bg-[var(--secondary-color)] text-white font-semibold py-3 px-6 rounded-lg shadow-md transition duration-150 ease-in-out transform hover:scale-105"
-                >
-                    Clean Another Area
-                </button>
-            </div>
+          <CelebrationScreen
+            completedTasks={tasks}
+            streak={streak}
+            enableGamification={enableGamification}
+            enableVoice={enableVoice}
+            onReset={handleReset}
+            apiKey={apiKey}
+          />
         );
       // Sensory Tracker screens
       case AppScreen.LogMoment:

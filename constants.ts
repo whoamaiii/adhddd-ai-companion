@@ -4,62 +4,114 @@ export const GEMINI_IMAGE_MODEL = "imagen-3.0-generate-002"; // If specific imag
 export const MAX_FILE_SIZE_MB = 5; // Max image file size in MB
 
 export const INITIAL_ANALYSIS_PROMPT = `
-You are an expert at analyzing images of messy rooms to help someone with ADHD clean.
-Given the image, identify key objects, their locations, and general areas of clutter.
-Focus on actionable items. For example: "scattered clothes on the floor near the bed", "multiple coffee mugs and wrappers on the desk", "overflowing trash can in the corner".
-Provide your analysis as a JSON array of objects, where each object has a "description" field containing the observation string.
+You are an expert at analyzing images of messy rooms with advanced spatial understanding to help someone with ADHD clean.
+Given the image, identify key objects, their locations, spatial relationships, and areas of clutter with enhanced detail.
+
+Focus on:
+1. Specific object identification with precise locations and spatial relationships
+2. Clutter "hotspots" that would have high visual/functional impact if addressed
+3. Contextual descriptions that help users locate and prioritize items
+4. Visual landmarks and spatial cues for easy navigation
+
+For each observation, provide enhanced spatial context including:
+- Object state and condition
+- Spatial relationships to other objects/surfaces
+- Suggested actions specific to the context
+- Visual cues to help locate items
+
+Provide your analysis as a JSON array of objects with enhanced spatial information:
 Example output format:
 [
-  {"description": "Scattered clothes on the floor near the bed."},
-  {"description": "Pile of books and papers on the nightstand."},
-  {"description": "Overflowing trash can next to the desk."}
+  {
+    "description": "Scattered clothes on the floor near the bed.",
+    "object": "clothes",
+    "location": "floor area near the foot of the bed",
+    "objectState": {
+      "condition": "scattered",
+      "quantity": 4,
+      "description": "Various clothing items spread across floor"
+    },
+    "spatialRelationships": [
+      {
+        "relationType": "scattered_around",
+        "relatedObject": "bed",
+        "description": "clothes items scattered within 2 feet of bed"
+      }
+    ],
+    "contextualDescription": "Multiple clothing items create a walking hazard near the bed",
+    "suggestedActions": ["Pick up each item individually", "Sort into clean/dirty piles"],
+    "clusterPriority": "hotspot"
+  }
 ]
 `;
 
 export const TASK_GENERATION_PROMPT_TEMPLATE = (observationsText: string): string => `
-You are an ADHD productivity coach specializing in creating cleaning plans.
-Based on the following observations of a messy space:
+You are an ADHD productivity coach specializing in creating spatially-aware cleaning plans.
+Based on the following spatial analysis of a messy space:
 ${observationsText}
 
-Generate a step-by-step cleaning plan optimized for ADHD brains.
+Generate a step-by-step cleaning plan optimized for ADHD brains with enhanced spatial understanding.
 The plan should:
 1. Start with very easy wins to build momentum.
-2. Break down larger tasks into small, manageable micro-tasks.
+2. Break down larger tasks into small, manageable micro-tasks with precise spatial guidance.
 3. Be encouraging and supportive in tone.
 4. Focus on one small area or category at a time to avoid overwhelm.
-5. Each task should be a short, clear action statement, ideally fitting on one to two short lines for mobile readability.
-6. Aim for around 5-10 tasks. If the area is very messy, focus on the most impactful initial steps.
-7. For each task, provide:
-    a. "text": The task description (string). This text should be concise.
-    b. "estimated_time": A brief time estimate (e.g., "1-2 mins", "Approx. 5 mins") (string).
+5. Use spatial relationships to sequence tasks efficiently.
+6. Include tool recommendations based on object types and locations.
+7. Provide visual cues and landmarks for easy task location.
+8. Each task should be a short, clear action statement with spatial context.
+9. Aim for around 5-10 tasks. If the area is very messy, focus on the most impactful initial steps.
+
+For each task, provide enhanced spatial information:
+    a. "text": The task description with spatial context (string).
+    b. "estimated_time": A brief time estimate (string).
     c. "difficulty_level": Its difficulty ("easy", "medium", or "hard") (string).
-    d. "prioritization_hint": (Optional) A very short hint if applicable (e.g., "Quick win!", "Unblocks other items", "Good for focus") (string).
+    d. "prioritization_hint": (Optional) A very short hint (string).
+    e. "spatialContext": Object with area, sequence, dependencies, and spatial impact.
+    f. "suggestedTools": Array of tools needed for this specific task.
+    g. "relatedObjects": Array of objects involved in the task.
+    h. "locationDescription": Precise location for easy finding.
+    i. "visualCues": Visual landmarks to help locate the task area.
 
-Provide the plan as a JSON array of objects, where each object contains "text", "estimated_time", "difficulty_level", and optionally "prioritization_hint". Do not include IDs or completion status.
-
-Example:
+Example with spatial enhancements:
 [
   {
-    "text": "Find a trash bag. If you don't have one, use any plastic bag for now.",
+    "text": "Find a trash bag from under the kitchen sink.",
     "estimated_time": "1 min",
     "difficulty_level": "easy",
-    "prioritization_hint": "Essential first step!"
+    "prioritization_hint": "Essential first step!",
+    "spatialContext": {
+      "area": "kitchen",
+      "sequence": 1,
+      "dependencies": [],
+      "spatialImpact": "high"
+    },
+    "suggestedTools": [],
+    "relatedObjects": ["trash bag", "kitchen sink"],
+    "locationDescription": "Cabinet under the kitchen sink, left side",
+    "visualCues": "Look for the cabinet handles below the sink faucet"
   },
   {
-    "text": "Pick up 3 pieces of visible trash from the floor and put them in the bag.",
-    "estimated_time": "2-3 mins",
-    "difficulty_level": "easy"
-  },
-  {
-    "text": "Locate one item of clothing on the floor and put it in the laundry hamper (or a designated 'dirty clothes' pile).",
-    "estimated_time": "1-2 mins",
+    "text": "Pick up the 3 candy wrappers from the coffee table surface.",
+    "estimated_time": "1 min",
     "difficulty_level": "easy",
-    "prioritization_hint": "Clears floor space."
-  },
-  {
-    "text": "Clear 5 small items (like wrappers or pens) from your main desk surface.",
-    "estimated_time": "3-5 mins",
-    "difficulty_level": "medium"
+    "prioritization_hint": "Quick visual win!",
+    "spatialContext": {
+      "area": "living room",
+      "sequence": 1,
+      "dependencies": ["task-1"],
+      "spatialImpact": "medium"
+    },
+    "suggestedTools": [
+      {
+        "name": "trash bag",
+        "purpose": "collect wrappers",
+        "optional": false
+      }
+    ],
+    "relatedObjects": ["candy wrappers", "coffee table"],
+    "locationDescription": "Center of the coffee table, next to the remote control",
+    "visualCues": "Look for the colorful wrappers near the TV remote"
   }
 ]
 `;
@@ -75,6 +127,25 @@ Examples:
 
 Respond with only the celebratory message, no extra text or formatting.
 Celebratory message:
+`;
+
+export const COMPLETION_SUMMARY_PROMPT_TEMPLATE = (completedTasksData: string): string => `
+You are an ADHD productivity coach celebrating a user's accomplishment of completing ALL their cleaning tasks.
+The user just finished this complete list of tasks:
+${completedTasksData}
+
+Generate a personalized, enthusiastic celebration message (2-3 sentences) that:
+1. Acknowledges the specific types of tasks they conquered (mention 1-2 specific examples)
+2. Highlights the effort and persistence required for someone with ADHD
+3. Makes them feel genuinely proud of their accomplishment
+4. Uses warm, encouraging language that avoids being overly clinical
+
+Examples:
+- "You just conquered organizing that cluttered desk AND sorting through all those scattered papers - that takes serious focus and determination! The way you pushed through each task one by one shows incredible persistence."
+- "Amazing work tackling both the kitchen cleanup and that pile of laundry - those are exactly the kinds of tasks that can feel overwhelming, but you powered through every single one!"
+
+Focus on their effort and specific accomplishments. Respond with only the celebration message, no extra formatting.
+Celebration message:
 `;
 
 export const SENSORY_INSIGHT_PROMPT_TEMPLATE = (momentsData: string): string => `

@@ -1,7 +1,7 @@
 
 import { GoogleGenAI, GenerateContentResponse, Part } from "@google/genai";
-import { GEMINI_TEXT_MODEL, INITIAL_ANALYSIS_PROMPT, TASK_GENERATION_PROMPT_TEMPLATE, TASK_COMPLETION_CELEBRATION_PROMPT_TEMPLATE, SENSORY_INSIGHT_PROMPT_TEMPLATE } from '../constants';
-import type { ImageAnalysisObservation, GeminiTaskResponseItem, Task, SensoryMoment } from '../types';
+import { GEMINI_TEXT_MODEL, INITIAL_ANALYSIS_PROMPT, TASK_GENERATION_PROMPT_TEMPLATE, TASK_COMPLETION_CELEBRATION_PROMPT_TEMPLATE, COMPLETION_SUMMARY_PROMPT_TEMPLATE, SENSORY_INSIGHT_PROMPT_TEMPLATE } from '../constants';
+import type { ImageAnalysisObservation, GeminiTaskResponseItem, Task, SensoryMoment, SpatialContext, SuggestedTool } from '../types';
 
 /**
  * Converts a base64 encoded image string to a GenerativePart object for the Gemini API.
@@ -133,7 +133,8 @@ export const generateCleaningPlanWithGemini = async (
   if (analysis.length === 0) {
     return [];
   }
-  const observationsText = analysis.map(obs => obs.description).join("\n");
+  // Use enhanced spatial data if available, otherwise fall back to description
+  const observationsText = JSON.stringify(analysis, null, 2);
   const prompt = TASK_GENERATION_PROMPT_TEMPLATE(observationsText);
 
   try {
@@ -146,7 +147,13 @@ export const generateCleaningPlanWithGemini = async (
     });
     
     const responseText = response.text ?? '';
-    const taskItems = parseJsonFromGeminiResponse<GeminiTaskResponseItem[]>(responseText, [], "tasks");
+    const taskItems = parseJsonFromGeminiResponse<(GeminiTaskResponseItem & {
+      spatialContext?: SpatialContext;
+      suggestedTools?: SuggestedTool[];
+      relatedObjects?: string[];
+      locationDescription?: string;
+      visualCues?: string;
+    })[]>(responseText, [], "tasks");
 
     // Validate the structure of the generated tasks
     if (!Array.isArray(taskItems) || (taskItems.length > 0 && typeof taskItems[0]?.text !== 'string')) {
@@ -162,12 +169,23 @@ export const generateCleaningPlanWithGemini = async (
         return [{text: "AI returned an empty task list. Perhaps the area is already clean or the observations were unclear."}];
     }
 
-    // Map the response to the Task partial type
-    return taskItems.map(item => ({
+    // Map the response to the Task partial type with spatial enhancements
+    return taskItems.map((item, index) => ({
       text: item.text,
       estimatedTime: item.estimated_time,
       difficulty: item.difficulty_level,
       prioritizationHint: item.prioritization_hint,
+      // Enhanced spatial fields with sensible defaults
+      spatialContext: item.spatialContext || {
+        area: 'general',
+        sequence: index + 1,
+        dependencies: [],
+        spatialImpact: 'medium'
+      },
+      suggestedTools: item.suggestedTools || [],
+      relatedObjects: item.relatedObjects || [],
+      locationDescription: item.locationDescription || item.text,
+      visualCues: item.visualCues
     }));
 
   } catch (error) {
@@ -254,5 +272,50 @@ export const generateCelebratoryMessageForTask = async (
     console.error("Error generating celebratory message with Gemini:", error);
     // Fallback in case of an API error
     return `Excellent work on: ${taskText.split('@')[0].trim()}!`;
+  }
+};
+
+/**
+ * Generates a comprehensive celebration message for completing all tasks.
+ * @param ai The initialized GoogleGenAI client.
+ * @param completedTasks Array of all completed tasks.
+ * @returns A promise that resolves to a personalized celebration message.
+ */
+export const generateCompletionSummary = async (
+  ai: GoogleGenAI,
+  completedTasks: Task[]
+): Promise<string> => {
+  if (!completedTasks || completedTasks.length === 0) {
+    return "Amazing work completing all your tasks!";
+  }
+
+  // Prepare task data for the prompt, limiting to avoid token overflow
+  const taskList = completedTasks.slice(0, 20).map((task, index) => 
+    `${index + 1}. ${task.text.split('@')[0].trim()}`
+  ).join('\n');
+  
+  // Add truncation note if there are more tasks
+  const tasksData = completedTasks.length > 20 
+    ? `${taskList}\n...and ${completedTasks.length - 20} more tasks`
+    : taskList;
+
+  const prompt = COMPLETION_SUMMARY_PROMPT_TEMPLATE(tasksData);
+
+  try {
+    const response: GenerateContentResponse = await ai.models.generateContent({
+      model: GEMINI_TEXT_MODEL,
+      contents: [{ parts: [{ text: prompt }] }],
+    });
+    
+    const celebrationText = response.text?.trim() ?? '';
+    if (celebrationText) {
+      return celebrationText;
+    }
+    // Fallback if the AI returns an empty string
+    return `Outstanding job completing all ${completedTasks.length} tasks! Your focus and determination really paid off.`;
+  } catch (error) {
+    console.error("Error generating completion summary with Gemini:", error);
+    // Fallback in case of an API error
+    return `Incredible work finishing all ${completedTasks.length} tasks! Each one was a step toward a cleaner, more organized space.`;
   }
 };

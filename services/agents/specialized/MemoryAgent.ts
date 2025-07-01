@@ -37,7 +37,7 @@ export class MemoryAgent extends BaseAgent {
                              h.taskId === context.currentTask?.id
                            ).length > 1;
     
-    return hasSkippedTasks || returningToTask;
+    return Boolean(hasSkippedTasks || returningToTask);
   }
 
   async analyze(context: AgentContext): Promise<AgentResponse | null> {
@@ -85,7 +85,7 @@ export class MemoryAgent extends BaseAgent {
     }
     
     if (context.currentTask?.metadata?.previousAttempts) {
-      contextInfo.push('🔄 You've worked on this before - you can do it!');
+      contextInfo.push('🔄 You have worked on this before - you can do it!');
     }
     
     return contextInfo;

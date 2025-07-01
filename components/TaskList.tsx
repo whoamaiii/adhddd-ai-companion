@@ -13,6 +13,7 @@ interface TaskListProps {
   onTaskDragStart: (taskId: string) => void;
   onTaskDragEnd: () => void;
   onAddTask: (taskText: string) => void;
+  agentSuggestions?: string[];
 }
 
 export const TaskList: React.FC<TaskListProps> = ({ 
@@ -24,7 +25,8 @@ export const TaskList: React.FC<TaskListProps> = ({
   draggingItemId,
   onTaskDragStart,
   onTaskDragEnd,
-  onAddTask
+  onAddTask,
+  agentSuggestions
 }) => {
   const [showAddTaskInput, setShowAddTaskInput] = useState(false);
   const [newTaskText, setNewTaskText] = useState("");
@@ -61,6 +63,24 @@ export const TaskList: React.FC<TaskListProps> = ({
         </div>
         <p className="text-[var(--text-secondary)] text-xs font-normal leading-normal text-right">{completedTasks} of {totalTasks} tasks completed</p>
       </div>
+
+      {/* Agent Suggestions */}
+      {agentSuggestions && agentSuggestions.length > 0 && (
+        <div className="mt-4 p-4 bg-[var(--surface-primary)] rounded-lg border border-[var(--border-light)] shadow-sm">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="material-icons-outlined text-[var(--accent-primary)] text-xl">auto_awesome</span>
+            <h3 className="text-sm font-semibold text-[var(--text-primary)]">AI Assistant Suggestions</h3>
+          </div>
+          <div className="space-y-2">
+            {agentSuggestions.map((suggestion, index) => (
+              <div key={index} className="flex items-start gap-2">
+                <span className="text-[var(--accent-primary)] mt-0.5">•</span>
+                <p className="text-sm text-[var(--text-secondary)] leading-relaxed">{suggestion}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="flex justify-between items-center pt-6 pb-4 text-left px-2 md:px-0">
         <h2 className="text-[var(--text-primary)] text-xl md:text-2xl font-bold leading-tight tracking-tight">
