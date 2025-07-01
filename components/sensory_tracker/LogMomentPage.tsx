@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import type { SensoryMoment } from '../../types';
 
-// Constants for tags and icons to keep the component clean.
-const BEHAVIOR_TAGS = ["Stimming", "Vocalizing", "Withdrawing", "Seeking Pressure", "Covering Ears", "Fidgeting"];
-const ENVIRONMENT_TAGS = ["Loud Noises", "Bright Lights", "Crowded", "Strong Smells", "New Place", "Transitioning"];
+// Standard-taggene fungerer nå som et utgangspunkt.
+const DEFAULT_BEHAVIOR_TAGS = ["Stimming", "Vocalizing", "Withdrawing", "Seeking Pressure", "Covering Ears", "Fidgeting"];
+const DEFAULT_ENVIRONMENT_TAGS = ["Loud Noises", "Bright Lights", "Crowded", "Strong Smells", "New Place", "Transitioning"];
 
 const iconMap: { [key: string]: string } = {
   "Stimming": "auto_awesome",
@@ -20,25 +20,39 @@ const iconMap: { [key: string]: string } = {
   "Transitioning": "arrow_forward",
 };
 
+// Props-interfacet er nå utvidet
 interface LogMomentPageProps {
   onSaveMoment: (moment: Omit<SensoryMoment, 'id' | 'timestamp'>) => void;
   onCancel: () => void;
+  customBehaviors: string[];
+  customEnvironments: string[];
 }
 
 /**
- * A screen for users to log their sensory experiences. It features a form with
- * selectable tags for behaviors and environments, a slider for overall state,
- * and an optional notes field. It's designed to be intuitive and mobile-first.
- *
- * @param {LogMomentPageProps} props - The component props.
- * @param props.onSaveMoment - Callback function to save the logged moment.
- * @param props.onCancel - Callback function to cancel the logging process.
+ * En skjerm for brukere å logge sine sensoriske opplevelser, nå med støtte for egendefinerte tagger.
  */
-export const LogMomentPage = ({ onSaveMoment, onCancel }: LogMomentPageProps) => {
+export const LogMomentPage = ({ 
+    onSaveMoment, 
+    onCancel,
+    customBehaviors,
+    customEnvironments 
+}: LogMomentPageProps) => {
   const [selectedBehaviors, setSelectedBehaviors] = useState<string[]>([]);
   const [selectedEnvironments, setSelectedEnvironments] = useState<string[]>([]);
   const [overallState, setOverallState] = useState<number>(3);
   const [contextNote, setContextNote] = useState('');
+
+  // Bruker useMemo for å effektivt kombinere standard og egendefinerte tagger
+  const allBehaviors = useMemo(() => {
+    const combined = [...DEFAULT_BEHAVIOR_TAGS, ...customBehaviors];
+    return Array.from(new Set(combined)); // fjerner duplikater
+  }, [customBehaviors]);
+
+  const allEnvironments = useMemo(() => {
+    const combined = [...DEFAULT_ENVIRONMENT_TAGS, ...customEnvironments];
+    return Array.from(new Set(combined)); // fjerner duplikater
+  }, [customEnvironments]);
+
 
   const handleTagToggle = (tag: string, type: 'behavior' | 'environment') => {
     const state = type === 'behavior' ? selectedBehaviors : selectedEnvironments;
@@ -60,35 +74,20 @@ export const LogMomentPage = ({ onSaveMoment, onCancel }: LogMomentPageProps) =>
     });
   };
 
-  /**
-   * Renders a single selectable tag button.
-   * This abstracts the button logic for both behaviors and environments.
-   * @param {string} tag - The text content of the tag.
-   * @param {'behavior' | 'environment'} type - The category of the tag.
-   * @returns {React.ReactElement} The rendered button element.
-   */
   const renderTag = (tag: string, type: 'behavior' | 'environment') => {
     const isSelected = type === 'behavior' ? selectedBehaviors.includes(tag) : selectedEnvironments.includes(tag);
-    
-    // Dynamically determine the color based on the tag type for a consistent theme.
     const baseColorVar = `var(--tag-${type})`;
-    
-    const classes = [
-      'group', 'relative', 'p-3', 'sm:p-4', 'rounded-2xl',
-      'flex', 'flex-col', 'items-center', 'justify-center', 'aspect-square',
-      'border-2', 'transition-all', 'duration-200', 'transform', 'active:scale-90',
-      isSelected
-        ? `bg-[${baseColorVar}] text-white border-[${baseColorVar}] scale-95 shadow-lg`
-        : `bg-[var(--surface-primary)] border-[var(--border-primary)] hover:border-[${baseColorVar}] hover:bg-[var(--surface-secondary)]`
-    ].join(' ');
+    const classes = `
+      group relative p-3 sm:p-4 rounded-2xl flex flex-col items-center justify-center aspect-square
+      border-2 transition-all duration-200 transform active:scale-90
+      ${isSelected ? `bg-[${baseColorVar}] text-white border-[${baseColorVar}] scale-95 shadow-lg` : `bg-[var(--surface-primary)] border-[var(--border-primary)] hover:border-[${baseColorVar}] hover:bg-[var(--surface-secondary)]`}
+    `;
 
     return (
-      <button 
-        key={tag} 
-        onClick={() => handleTagToggle(tag, type)} 
-        className={classes}
-      >
-        <span className={`material-icons-outlined text-3xl sm:text-4xl mb-2 transition-colors ${isSelected ? 'text-white' : 'text-[var(--text-secondary)]'}`}>{iconMap[tag]}</span>
+      <button key={tag} onClick={() => handleTagToggle(tag, type)} className={classes}>
+        <span className={`material-icons-outlined text-3xl sm:text-4xl mb-2 transition-colors ${isSelected ? 'text-white' : 'text-[var(--text-secondary)]'}`}>
+          {iconMap[tag] || 'label'} {/* Bruker et standard-ikon hvis et egendefinert ikon ikke finnes */}
+        </span>
         <span className="text-xs sm:text-sm font-semibold text-center">{tag}</span>
       </button>
     );
@@ -104,15 +103,17 @@ export const LogMomentPage = ({ onSaveMoment, onCancel }: LogMomentPageProps) =>
       <main className="flex-1 p-4 overflow-y-auto space-y-8 pb-28">
         <section>
           <h2 className="text-lg font-bold text-[var(--text-secondary)] mb-4">What's Happening?</h2>
+          {/* Viser nå den kombinerte listen med tagger */}
           <div className="grid grid-cols-3 gap-3">
-            {BEHAVIOR_TAGS.map(tag => renderTag(tag, 'behavior'))}
+            {allBehaviors.map(tag => renderTag(tag, 'behavior'))}
           </div>
         </section>
 
         <section>
           <h2 className="text-lg font-bold text-[var(--text-secondary)] mb-4">Environment</h2>
+          {/* Viser nå den kombinerte listen med tagger */}
           <div className="grid grid-cols-3 gap-3">
-            {ENVIRONMENT_TAGS.map(tag => renderTag(tag, 'environment'))}
+            {allEnvironments.map(tag => renderTag(tag, 'environment'))}
           </div>
         </section>
 
@@ -148,10 +149,7 @@ export const LogMomentPage = ({ onSaveMoment, onCancel }: LogMomentPageProps) =>
       </main>
 
       <footer className="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-[var(--background-primary)] to-transparent">
-        <button 
-          onClick={handleSave} 
-          className="w-full py-4 text-lg font-bold text-white bg-[var(--accent-primary)] rounded-2xl hover:bg-opacity-90 transition-all duration-200 transform active:scale-95 shadow-lg shadow-[var(--accent-primary)]/20"
-        >
+        <button onClick={handleSave} className="w-full py-4 text-lg font-bold text-white bg-[var(--accent-primary)] rounded-2xl hover:bg-opacity-90 transition-all duration-200 transform active:scale-95 shadow-lg shadow-[var(--accent-primary)]/20">
           Save Moment
         </button>
       </footer>

@@ -1,9 +1,18 @@
 import React, { useState, useMemo } from 'react';
 import type { SensoryMoment } from '../../types';
+import SensorySettings from './SensorySettings';
 
 // Constants for tags to avoid re-calculating them on every render
 const BEHAVIOR_TAGS = ["Stimming", "Vocalizing", "Withdrawing", "Seeking Pressure", "Covering Ears", "Fidgeting"];
 const ENVIRONMENT_TAGS = ["Loud Noises", "Bright Lights", "Crowded", "Strong Smells", "New Place", "Transitioning"];
+
+interface TimelinePageProps {
+  moments: SensoryMoment[];
+  customBehaviors: string[];
+  customEnvironments: string[];
+  onAddCustomTag: (tag: string, type: 'behavior' | 'environment') => void;
+  onDeleteCustomTag: (tag: string, type: 'behavior' | 'environment') => void;
+}
 
 // --- Helper Components ---
 
@@ -81,8 +90,15 @@ const MomentCard: React.FC<{ moment: SensoryMoment }> = ({ moment }) => {
 /**
  * The main timeline page component for displaying sensory moments with filtering capabilities.
  */
-const TimelinePage: React.FC<{ moments: SensoryMoment[] }> = ({ moments }) => {
+const TimelinePage: React.FC<TimelinePageProps> = ({ 
+  moments,
+  customBehaviors,
+  customEnvironments,
+  onAddCustomTag,
+  onDeleteCustomTag
+}) => {
   const [isFilterVisible, setIsFilterVisible] = useState(false);
+  const [isSettingsVisible, setIsSettingsVisible] = useState(false);
   const [selectedBehaviors, setSelectedBehaviors] = useState<string[]>([]);
   const [selectedEnvironments, setSelectedEnvironments] = useState<string[]>([]);
 
@@ -113,14 +129,47 @@ const TimelinePage: React.FC<{ moments: SensoryMoment[] }> = ({ moments }) => {
     setSelectedEnvironments([]);
   };
 
+  const openSettings = () => {
+    setIsFilterVisible(false);
+    setIsSettingsVisible(true);
+  }
+
+  const openFilters = () => {
+    setIsSettingsVisible(false);
+    setIsFilterVisible(prev => !prev);
+  }
+
+  const closePanels = () => {
+    setIsFilterVisible(false);
+    setIsSettingsVisible(false);
+  }
+
   return (
     <div className="flex flex-col min-h-[calc(100vh-theme(spacing.32))] bg-[var(--background-primary)] text-[var(--text-primary)]">
       <header className="sticky top-0 z-20 flex items-center justify-between p-4 bg-transparent backdrop-blur-sm">
+        <div className="w-20"></div>
         <h1 className="text-xl font-bold flex-1 text-center">Timeline</h1>
-        <button onClick={() => setIsFilterVisible(!isFilterVisible)} className="p-2 rounded-full hover:bg-[var(--surface-secondary)] transition-colors">
-          <span className="material-icons-outlined">{isFilterVisible ? 'close' : 'filter_list'}</span>
-        </button>
+        <div className="flex items-center justify-end w-20">
+          <button onClick={openSettings} className="p-2 rounded-full hover:bg-[var(--surface-secondary)] transition-colors">
+            <span className="material-icons-outlined">settings</span>
+          </button>
+          <button onClick={openFilters} className="p-2 rounded-full hover:bg-[var(--surface-secondary)] transition-colors">
+            <span className="material-icons-outlined">{isFilterVisible ? 'close' : 'filter_list'}</span>
+          </button>
+        </div>
       </header>
+
+      {/* Settings Panel */}
+      {isSettingsVisible && (
+        <SensorySettings 
+          moments={moments} 
+          onClose={() => setIsSettingsVisible(false)}
+          customBehaviors={customBehaviors}
+          customEnvironments={customEnvironments}
+          onAddTag={onAddCustomTag}
+          onDeleteTag={onDeleteCustomTag}
+        />
+      )}
 
       {/* Filter Panel */}
       {isFilterVisible && (

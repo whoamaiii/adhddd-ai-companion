@@ -9,9 +9,9 @@ import { SettingsPanel } from './components/SettingsPanel';
 import { MessageCard } from './components/MessageCard';
 import { LandingPage } from './components/LandingPage';
 import Footer from './components/Footer';
-import LogMomentPage from './components/sensory_tracker/LogMomentPage.tsx';
-import TimelinePage from './components/sensory_tracker/TimelinePage.tsx';
-import DashboardPage from './components/sensory_tracker/DashboardPage.tsx';
+import LogMomentPage from './components/sensory_tracker/LogMomentPage';
+import TimelinePage from './components/sensory_tracker/TimelinePage';
+import DashboardPage from './components/sensory_tracker/DashboardPage';
 import BottomNav from './components/shared/BottomNav';
 import { AppScreen } from './types';
 import type { Task, ImageAnalysisObservation, SensoryMoment } from './types';
@@ -90,6 +90,32 @@ const App: React.FC = () => {
     return [];
   });
 
+  const [customBehaviors, setCustomBehaviors] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('adhddd_customBehaviors');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch (e) {
+      console.error('[Data Persistence] Failed to load custom behaviors:', e);
+    }
+    return [];
+  });
+  
+  const [customEnvironments, setCustomEnvironments] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('adhddd_customEnvironments');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch (e) {
+      console.error('[Data Persistence] Failed to load custom environments:', e);
+    }
+    return [];
+  });
+
   // Persistence effects
   // Effect to save tasks to localStorage whenever the tasks state changes.
   useEffect(() => {
@@ -113,6 +139,41 @@ const App: React.FC = () => {
       console.error('[Data Persistence] Failed to save sensory moments to localStorage:', e);
     }
   }, [sensoryMoments]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('adhddd_customBehaviors', JSON.stringify(customBehaviors));
+    } catch (e) {
+      console.error('[Data Persistence] Failed to save custom behaviors:', e);
+    }
+  }, [customBehaviors]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('adhddd_customEnvironments', JSON.stringify(customEnvironments));
+    } catch (e) {
+      console.error('[Data Persistence] Failed to save custom environments:', e);
+    }
+  }, [customEnvironments]);
+
+  const handleAddCustomTag = useCallback((tag: string, type: 'behavior' | 'environment') => {
+    if (!tag.trim()) return;
+    const sanitizedTag = tag.trim();
+    
+    if (type === 'behavior') {
+      setCustomBehaviors(prev => [...new Set([...prev, sanitizedTag])]);
+    } else {
+      setCustomEnvironments(prev => [...new Set([...prev, sanitizedTag])]);
+    }
+  }, []);
+
+  const handleDeleteCustomTag = useCallback((tag: string, type: 'behavior' | 'environment') => {
+    if (type === 'behavior') {
+      setCustomBehaviors(prev => prev.filter(t => t !== tag));
+    } else {
+      setCustomEnvironments(prev => prev.filter(t => t !== tag));
+    }
+  }, []);
 
   const handleLaunchCleaningTool = useCallback(() => {
     setCurrentScreen(AppScreen.ImageUpload);
@@ -498,9 +559,22 @@ const determineNextTaskIndex = (tasksList: Task[], completedTaskId: string): num
         );
       // Sensory Tracker screens
       case AppScreen.LogMoment:
-        return <LogMomentPage onSaveMoment={handleSaveMoment} onCancel={handleCancelLogMoment} />;
+        return <LogMomentPage 
+            onSaveMoment={handleSaveMoment} 
+            onCancel={handleCancelLogMoment}
+            customBehaviors={customBehaviors}
+            customEnvironments={customEnvironments}
+        />;
       case AppScreen.Timeline:
-        return <TimelinePage moments={sensoryMoments} />;
+        return (
+          <TimelinePage 
+            moments={sensoryMoments} 
+            customBehaviors={customBehaviors}
+            customEnvironments={customEnvironments}
+            onAddCustomTag={handleAddCustomTag}
+            onDeleteCustomTag={handleDeleteCustomTag}
+          />
+        );
       case AppScreen.Dashboard:
         return <DashboardPage moments={sensoryMoments} />;
       default: 
