@@ -205,9 +205,19 @@ const App: React.FC = () => {
 
   const speak = useCallback((text: string) => {
     if (enableVoice && 'speechSynthesis' in window) {
-      window.speechSynthesis.cancel(); // Cancel any previous speech
-      const utterance = new SpeechSynthesisUtterance(text);
-      window.speechSynthesis.speak(utterance);
+      try {
+        window.speechSynthesis.cancel(); // Cancel any previous speech
+        const utterance = new SpeechSynthesisUtterance(text);
+        
+        // Add error handler for utterance
+        utterance.onerror = (event) => {
+          console.error('Speech synthesis error:', event.error);
+        };
+        
+        window.speechSynthesis.speak(utterance);
+      } catch (error) {
+        console.error('Failed to synthesize speech:', error);
+      }
     }
   }, [enableVoice]);
 
@@ -243,7 +253,10 @@ const determineNextTaskIndex = (tasksList: Task[], completedTaskId: string): num
   const currentCompletedTaskIndex = tasksList.findIndex(task => task.id === completedTaskId);
 
   // Should not happen if logic is correct, but as a safeguard:
-  if (currentCompletedTaskIndex === -1) return tasksList.findIndex(t => !t.isCompleted) ?? -1;
+  if (currentCompletedTaskIndex === -1) {
+    const nextIncomplete = tasksList.findIndex(t => !t.isCompleted);
+    return nextIncomplete !== -1 ? nextIncomplete : -1;
+  }
 
   for (let i = 1; i <= tasksList.length; i++) {
     const nextPotentialIndex = (currentCompletedTaskIndex + i) % tasksList.length;
