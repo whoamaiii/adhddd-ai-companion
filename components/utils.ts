@@ -7,8 +7,28 @@
  */
 export function decode(base64: string): Uint8Array {
   try {
-    const binaryString = window.atob(base64);
+    // Input validation: check if base64 is a valid string and not empty
+    if (!base64 || typeof base64 !== 'string') {
+      throw new Error('Invalid input: base64 must be a non-empty string');
+    }
+    
+    // Basic base64 format validation (should only contain valid base64 characters)
+    const base64Regex = /^[A-Za-z0-9+/]*={0,2}$/;
+    if (!base64Regex.test(base64)) {
+      throw new Error('Invalid base64 format: contains invalid characters');
+    }
+    
+    // Additional length validation (base64 strings should be multiples of 4 when padded)
+    const paddedBase64 = base64.padEnd(Math.ceil(base64.length / 4) * 4, '=');
+    
+    const binaryString = window.atob(paddedBase64);
     const len = binaryString.length;
+    
+    // Prevent extremely large allocations that could cause memory issues
+    if (len > 100 * 1024 * 1024) { // 100MB limit
+      throw new Error('Decoded data too large: exceeds 100MB limit');
+    }
+    
     const bytes = new Uint8Array(len);
     for (let i = 0; i < len; i++) {
       bytes[i] = binaryString.charCodeAt(i);

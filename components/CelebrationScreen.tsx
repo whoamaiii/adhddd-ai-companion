@@ -123,8 +123,18 @@ export const CelebrationScreen: React.FC<CelebrationScreenProps> = ({
       }
       
       if (announcement) {
-        const utterance = new SpeechSynthesisUtterance(announcement);
-        window.speechSynthesis.speak(utterance);
+        try {
+          const utterance = new SpeechSynthesisUtterance(announcement);
+          
+          // Add error handler for utterance
+          utterance.onerror = (event) => {
+            console.error('Speech synthesis error in celebration:', event.error);
+          };
+          
+          window.speechSynthesis.speak(utterance);
+        } catch (error) {
+          console.error('Failed to synthesize celebration speech:', error);
+        }
       }
     }
   }, [currentStage, enableVoice, taskStats, aiPraiseMessage, streak, enableGamification]);
